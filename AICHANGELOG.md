@@ -603,3 +603,38 @@
 - 更新:
   - `AICHANGELOG.md`
   - `Plan.md`
+
+---
+
+## 2026-09-21: Phase 2 - タスク14: アプリケーション全体のローカル結合検証（py_compile および pytest）
+
+### 概要
+アプリケーション全体（`app.py`, `data_loader.py`, `db.py`, `quiz_logic.py`, `styles.py`, `views/*.py`）の構文検証・インポートチェック、および各モジュール・UI・DB・ビジネスロジックが連携して正しく機能することを実証する包括的な結合テスト `tests/test_integration.py` を新規実装。Streamlit `AppTest` による E2E レベルでの初期ロード・画面ナビゲーション・認証切り替え検証に加え、実マスターデータ（全272語）を用いたクイズ出題・回答・DB保存・苦手ノート反映・苦手復習モード開放・心情語辞典連動・学習履歴初期化の一連のライフサイクル結合テストを実装した。全148件の pytest テストおよび全ファイルの py_compile がすべて正常終了（Exit Code 0）することを確認。
+
+### Before / After
+- **Before:**
+  - 単体テスト（各モジュール単体の pytest）は存在したが、アプリケーション全体を通した E2E レベルの画面遷移検証（`AppTest`）や、実CSV・DB・ビジネスロジック・各Viewを結合した学習サイクル全体のシナリオテストが存在しなかった。
+  - プロジェクト全体の全ソースコードに対する網羅的な `py_compile` 自動テストが未整備であった。
+- **After:**
+  - `tests/test_integration.py` を新規作成（全9テストケース）：
+    - **1. 構文・コンパイル結合検証 (`TestAllModulesCompilation`)**:
+      - `test_py_compile_all_source_files`: プロジェクトの全主要ソースコード（`app.py`, `data_loader.py`, `db.py`, `quiz_logic.py`, `styles.py`, `views/__init__.py`, `views/quiz_view.py`, `views/review_view.py`, `views/dictionary_view.py`）を `py_compile.compile(doraise=True)` で検証。
+    - **2. Streamlit AppTest E2E結合検証 (`TestAppTestE2E`)**:
+      - `test_app_initial_load_in_dev_mode`: `DEV_MODE=True` 環境で自動ログインされクイズ選択画面が正常描画されることを確認。
+      - `test_app_navigation_between_views`: サイドバーラジオメニュー経由での「クイズ ➔ 苦手ノート ➔ 心情語辞典 ➔ クイズ」の双方向画面遷移を確認。
+      - `test_app_logout_and_login_screen_rendering`: ログアウト操作時に未認証状態へ移行し、開発ログイン画面が表示されることを確認。
+      - `test_app_production_mode_unauthenticated`: `DEV_MODE=False`（本番モード）時のログイン要求バナーおよび案内画面のレンダリングを確認。
+    - **3. 学習サイクル結合シナリオ検証 (`TestLearningFlowIntegration`)**:
+      - `test_full_quiz_to_review_flow`: 実データ272語から10問抽出 ➔ 正解4問・不正解6問の回答 ➔ `LocalJsonDB` への記録 ➔ 苦手ノート（`build_review_items`, `filter_and_sort_review_items`）への6問反映を結合検証。
+      - `test_failed_review_mode_unlock_flow`: 不正解9問の時点では苦手復習モードがロックされ（`can_start_review_mode == False`）、10問目の不正解記録によりモードが開放され、過去の苦手問題10問から正しく抽出出題されることを結合検証。
+      - `test_quiz_results_reflected_in_dictionary`: クイズ回答結果（正解/不正解回数、直近結果、苦手フラグ）が心情語辞典（`dictionary_view`）のデータモデルおよび検索（単語名・意味・類語ポイント）と正常連動することを検証。
+      - `test_user_stats_reset_flow`: 開発者ツール/DBの履歴初期化機能（`reset_user_stats`）により、蓄積された学習履歴・苦手語リストが完全に消去されることを検証。
+  - プロジェクト全テスト（148テスト）がすべてパス（Exit Code 0）。
+
+### 影響範囲
+- 新規作成:
+  - `tests/test_integration.py`
+- 更新:
+  - `AICHANGELOG.md`
+  - `Plan.md`
+
