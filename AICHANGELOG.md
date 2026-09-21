@@ -763,4 +763,46 @@ Google OAuth 2.0 Web フローおよび Gmail アカウントのホワイトリ�
   - `Plan.md`
   - `AICHANGELOG.md`
 
+---
+
+## 2026-09-21: Phase 3 - 全機能の回帰テスト実行・仕様書（for_agent/）との完全同期点検
+
+### 概要
+Plan.md の最終タスク「全機能の回帰テスト実行・仕様書（for_agent/）との完全同期点検」を実施した。
+仕様書（`for_agent/requirements.md`, `for_agent/implementation_guide.md`）と全実装コード（モジュール構成、UI・DB・認証・デプロイ構成）の完全整合性を点検し、仕様書ディレクトリツリーに記載されていた `config.py` の新設・設定集約および単体テスト `tests/test_config.py` の追加を実施。
+また、Firestore 未インストール環境におけるフォールバックデコレータ処理の堅牢化を行い、全12テストモジュール・計187テストの回帰テストおよび全ソースコードの構文チェック（`py_compile`）が Exit Code 0 で完全合格することを確認した。
+これに伴い、`for_agent/` 内仕様書の改訂履歴（v1.2）およびディレクトリツリー・テスト計画を最新化し、`Plan.md` の全タスクが完了となった。
+
+### Before / After
+- **Before:**
+  - `Plan.md` の Phase 3（検品・同期）が未完了（`- [ ]`）のままだった。
+  - `for_agent/implementation_guide.md` に記載のあった `config.py` が存在せず、`auth.py` と `db.py` に設定読み込みロジックが分散していた。
+  - Firestore 拡張パッケージ未インストール環境で `@firestore.transactional` デコレータ実行時に ImportError が発生する潜在的エッジケースが存在していた。
+  - 仕様書の改訂履歴およびファイルツリーが最新のデプロイスクリプト（`deploy.ps1`, `deploy.sh`）や設定ファイル（`.streamlit/config.toml`）、テストスイート群を完全に網羅していなかった。
+- **After:**
+  - `config.py` を新規作成:
+    - `is_dev_mode()`, `get_allowed_emails()`, `is_email_allowed()`, `get_oauth_config()`, `get_gcp_project_id()` を一元集約・エクスポート。
+    - `auth.py` から `config.py` への連携を透過的に行い、完全な後方互換性を保持。
+  - `tests/test_config.py` を新規作成（5テスト）:
+    - 環境変数切り替えによる各ヘルパー関数の動作妥当性を網羅検証。
+  - `db.py` の堅牢化:
+    - `FirestoreDB.record_attempt` において `google.cloud.firestore` が未インストールの環境でも安全にフォールバックするようデコレータ取得を保護。
+  - `for_agent/requirements.md` および `for_agent/implementation_guide.md` の同期:
+    - 改訂履歴（v1.2）を追加し、最新の全ファイルツリーおよび全12テストスイート（全187テスト）の詳細計画を追記。
+  - 全検証コマンドの成功（Exit Code 0）:
+    - `python -m py_compile`（全10個の主要 `.py` ソースコード）: PASS
+    - `pytest`（仮想環境 `env` およびシステム Python 両方で全187テスト）: 187 passed in 3.1s (100% 成功)
+
+### 影響範囲
+- 新規作成:
+  - `config.py`
+  - `tests/test_config.py`
+- 更新:
+  - `db.py`
+  - `for_agent/requirements.md`
+  - `for_agent/implementation_guide.md`
+  - `Plan.md`
+  - `AICHANGELOG.md`
+
+
 

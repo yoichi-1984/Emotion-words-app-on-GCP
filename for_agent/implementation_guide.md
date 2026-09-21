@@ -5,6 +5,7 @@
 | :--- | :--- | :--- | :--- |
 | 2026-09-21 | 1.0 | 初版作成（モジュール構成、状態遷移、UI・DB・出題詳細設計の策定） | AI Pair Programmer |
 | 2026-09-21 | 1.1 | styles.py のUIコンポーネントヘルパー関数仕様（カード・バナー・バッジ・統計表示）の追記 | AI Pair Programmer |
+| 2026-09-21 | 1.2 | 全機能実装完了・テストスイート（187テスト）配備・デプロイ構成の完全同期反映 | AI Pair Programmer |
 
 ---
 
@@ -20,7 +21,12 @@
 58_language-app/
 ├── .env.example               # 環境変数のサンプルファイル
 ├── .gitignore                 # .env, secrets.yaml, __pycache__, service_account.json を除外
+├── .dockerignore              # Dockerビルド時の機密・不要ファイル除外設定
+├── .streamlit/                # Streamlitサーバー設定
+│   └── config.toml            # ポート8080、headless、UIテーマ定義
 ├── Dockerfile                 # Cloud Run デプロイ用 Dockerfile
+├── deploy.ps1                 # Windows用 Cloud Run 自動デプロイスクリプト
+├── deploy.sh                  # Linux/macOS用 Cloud Run 自動デプロイスクリプト
 ├── requirements.txt           # 依存ライブラリ一覧
 ├── app.py                     # メインエントリーポイント（認証・ルーティング・サイドバー）
 ├── config.py                  # 設定管理（環境変数読み込み、DEV_MODE判定、ホワイトリスト）
@@ -34,6 +40,22 @@
 │   ├── quiz_view.py           # クイズ画面（モード選択、1問1答、結果画面）
 │   ├── review_view.py         # 苦手ノート画面（間違えた問題一覧・集計ソート）
 │   └── dictionary_view.py     # 心情語辞典画面（全272語一覧・検索・詳細展開）
+├── tests/                     # 単体・結合テストスイート（全187テスト）
+│   ├── __init__.py
+│   ├── test_app.py            # メインアプリ画面遷移・初期化・ルーティングテスト
+│   ├── test_auth.py           # 認証・OAuth Webフロー・ホワイトリストテスト
+│   ├── test_config.py         # 設定管理モジュールテスト
+│   ├── test_data_loader.py    # CSV読み込み・単語データ整合性テスト
+│   ├── test_db.py             # LocalJsonDB & FirestoreDB データアクセス層テスト
+│   ├── test_deployment.py     # Dockerfile・.dockerignore・config.toml デプロイ構成テスト
+│   ├── test_dictionary_view.py# 心情語辞典画面UI・フィルタ・検索テスト
+│   ├── test_integration.py    # エンドツーエンド学習フロー結合テスト
+│   ├── test_quiz_logic.py     # 出題抽出・4択動的生成・正誤判定テスト
+│   ├── test_quiz_view.py      # クイズ画面UI・進行・結果表示テスト
+│   ├── test_review_view.py    # 苦手ノート画面UI・ソート・集計テスト
+│   └── test_styles.py         # CSS・UIカード・バナー・バッジ生成テスト
+├── docs/                      # 運用・デプロイ関連ドキュメント
+│   └── cloud_run_deployment.md# Cloud Run デプロイ・運用手順書
 ├── for_agent/                 # エージェント用仕様書・設計書
 │   ├── requirements.md        # 要件定義書
 │   └── implementation_guide.md# 本実装指示書
@@ -320,11 +342,22 @@ GCP_PROJECT_ID=your-gcp-project-id
 
 ## 9. テスト & 検証計画
 
-1. **単体テスト (`tests/test_quiz_logic.py`)**:
-   * `all_words.csv` の読み込み検証（全272語、欠損値なし）。
-   * 4択生成ロジックの検証（正解が必ず1つ含まれること、ダミー3つが重複しないこと）。
-   * 正誤判定および統計計算（正解率計算）の検証。
-   * 苦手復習モードの10問未満ガード条件の検証。
-2. **ローカルUI動作確認**:
-   * `DEV_MODE=True` で `streamlit run app.py` を実行。
-   * モード1 / モード2 で10問回答し、結果画面、苦手ノート、辞典画面への遷移を検証。
+### 9.1 自動回帰テストスイート (`tests/` 配下 全187テスト)
+以下の12テストモジュールにより、全機能・エッジケース・異常系を網羅的に自動検証する：
+1. **`tests/test_data_loader.py` (15 tests)**: CSV読み込み、全272語完全性、カテゴリ8分類整合性、欠損値・難易度妥当性
+2. **`tests/test_quiz_logic.py` (25 tests)**: 10問サンプリング、4択動的生成（正解1+ダミー3重複なし）、正誤判定、苦手復習10問未満ガード
+3. **`tests/test_db.py` (31 tests)**: LocalJsonDB / FirestoreDB、WordStatモデル、アトミック更新、トランザクション、履歴保持
+4. **`tests/test_styles.py` (15 tests)**: CSSインジェクション、カード・バナー・バッジHTMLエスケープ＆描画
+5. **`tests/test_quiz_view.py` (13 tests)**: クイズUIフロー、モード選択、出題カード、読み確認popover、結果表示
+6. **`tests/test_review_view.py` (15 tests)**: 苦手ノートUI、不正解語句抽出、ソート（回数/率/番号）、詳細展開
+7. **`tests/test_dictionary_view.py` (19 tests)**: 心情語辞典UI、カテゴリ・難易度フィルタ、検索絞り込み、カード展開
+8. **`tests/test_auth.py` (19 tests)**: DEV_MODE擬似ログイン、Google OAuth 2.0 Webフロー、Gmailホワイトリスト認可
+9. **`tests/test_config.py` (5 tests)**: 設定管理モジュール（DEV_MODE、ホワイトリスト、OAuth設定、GCPプロジェクトID）
+10. **`tests/test_app.py` (16 tests)**: メインルーティング、サイドバーナビゲーション、セッション状態管理、エラーハンドリング
+11. **`tests/test_deployment.py` (5 tests)**: Dockerfile、.dockerignore、.streamlit/config.toml、デプロイスクリプト構成検証
+12. **`tests/test_integration.py` (9 tests)**: エンドツーエンド学習ライフサイクル（出題→回答→判定→DB更新→復習反映）
+
+### 9.2 ローカルUI動作確認
+* `DEV_MODE=True` で `streamlit run app.py` を実行。
+* クイズ各モード（心情語→意味、意味→心情語、全カテゴリ/カテゴリ固定/苦手復習）の通し学習、苦手ノートへの即時反映、辞典検索の正常動作を確認。
+

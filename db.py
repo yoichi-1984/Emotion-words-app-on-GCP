@@ -354,13 +354,17 @@ class FirestoreDB(DatabaseInterface):
         """1問の回答結果を保存・更新し、更新後の WordStat を返す。
         トランザクションを用いて同時書き込みの整合性を担保する。
         """
-        from google.cloud import firestore
+        try:
+            from google.cloud import firestore
+            transactional_decorator = firestore.transactional
+        except (ImportError, AttributeError):
+            transactional_decorator = lambda f: f
 
         record_time = timestamp or get_current_jst_iso()
         user_ref = self.client.collection("users").document(email)
         doc_ref = user_ref.collection("stats").document(str(word_no))
 
-        @firestore.transactional
+        @transactional_decorator
         def _update_in_transaction(txn) -> WordStat:
             snapshot = doc_ref.get(transaction=txn)
             if snapshot.exists:

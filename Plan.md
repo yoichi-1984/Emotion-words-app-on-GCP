@@ -31,4 +31,5 @@
 - [x] 17. Dockerfile の作成および Cloud Run デプロイ設定の整備
 
 ### フェーズ3: 検品・同期（Phase 3: Review & Sync）
-- [ ] 全機能の回帰テスト実行・仕様書（for_agent/）との完全同期点検
+- [x] 全機能の回帰テスト実行・仕様書（for_agent/）との完全同期点検
+
