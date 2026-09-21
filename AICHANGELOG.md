@@ -511,4 +511,50 @@
   - `AICHANGELOG.md`
   - `Plan.md`
 
+---
+
+## 2026-09-21: Phase 2 - タスク12: views/dictionary_view.py の実装（心情語辞典画面・全272語検索・フィルタ・詳細展開）
+
+### 概要
+心情語辞典画面のUIおよび検索・フィルタ・50音順ソート・ページネーションロジックを提供する `views/dictionary_view.py` を新規実装。全272語の全体集計サマリー（収録語数・難易度別語数）、キーワード検索（単語・読み・意味・例文・つまずきポイント）、カテゴリ（全8種）および難易度（並・中・高）による絞り込み、50音順（あいうえお順）・単語番号順・カテゴリ順・難易度順のソート、スマホ負荷軽減のためのページネーション（20/50/100/すべて）、単語カードのアコーディオン詳細展開表示（意味、物語文場面例、つまずきポイント）、およびユーザーの学習履歴（正解/苦手回数・直近結果）表示機能を完備した。さらに単体テスト `tests/test_dictionary_view.py` を新規作成し、全126件の pytest テストがすべて正常終了（Exit Code 0）することを確認。
+
+### Before / After
+- **Before:**
+  - `views/dictionary_view.py` が存在せず、全272語を自由に閲覧・検索・学習できる心情語辞典機能が未実装であった。
+  - 50音順や難易度別でのソート・絞り込み、およびページ分割表示のロジックが存在しなかった。
+- **After:**
+  - `views/dictionary_view.py` を新規実装：
+    - **定数定義**:
+      - `SORT_READING`（50音順）、`SORT_WORD_NO`（単語番号順）、`SORT_CATEGORY`（カテゴリ順）、`SORT_DIFFICULTY_ASC`（難易度昇順: 並→中→高）、`SORT_DIFFICULTY_DESC`（難易度降順: 高→中→並）。
+      - `DIFFICULTY_OPTIONS`（すべて、並、中、高）、`DIFF_RANK`（重み付け辞書）。
+      - `PAGE_SIZE_OPTIONS`（20, 50, 100, "すべて"）。
+    - **ビジネスロジック関数**:
+      - `calculate_dictionary_summary(words)`: 収録語数、難易度別語数（並/中/高）、カテゴリ数を集計。
+      - `filter_and_sort_dictionary_items(words, category, difficulty, search_query, sort_by)`: カテゴリ絞り込み、難易度絞り込み、キーワード検索（単語・読み・意味・場面例・つまずきポイントの複合検索）、および5種類のソートを適用。
+      - `paginate_items(items, page, page_size)`: 指定ページとページサイズでの安全なスライスおよび総ページ数計算（境界値クランプ対応）。
+    - **UIレンダリング関数**:
+      - `render_dictionary_view(all_words, db, user_email)`: メイン描画エントリーポイント。
+      - **サマリー統計カード**: 「収録語数」「並レベル」「中レベル」「高レベル」の4列カード表示。
+      - **検索・表示件数バー**: 全文検索入力および1ページあたりの件数選択。
+      - **絞り込み・ソート行**: カテゴリ選択、難易度選択、ソート選択の3列配置。
+      - **ページネーションナビゲーション**: 複数ページ時にドロップダウンによるページ切り替えと現在表示範囲の案内。
+      - **単語アコーディオン一覧**: 単語番号・単語・読み・難易度、および学習状況（苦手ミス回数、習得済回数）をヘッダーに表示。展開時に学習詳細（出題回数・ミス率・直近結果）と単語詳細カード（`display_word_detail_card`）を描画。
+  - `views/__init__.py` に `render_dictionary_view` のエクスポートを追加。
+  - `tests/test_dictionary_view.py` を新規作成（全19テストケース）：
+    - `calculate_dictionary_summary`: 通常および空リスト時の集計正確性テスト。
+    - `filter_and_sort_dictionary_items`: カテゴリフィルタ、難易度フィルタ、単語・読み・意味・例文・ヒントの各検索、前後空白対応、複合検索、5種類のソート（50音順、単語番号順、カテゴリ順、難易度昇順/降順）の網羅的テスト。
+    - `paginate_items`: ページ分割、範囲外ページのクランプ補正、全件表示（page_size<=0）、空リスト時のテスト。
+    - `render_dictionary_view`: 空リスト時、通常描画時、DB学習履歴連携時、検索該当なし警告表示時の描画分岐テスト。
+  - 構文チェック `python -m py_compile` および `pytest`（全126テスト）がすべてパス（Exit Code 0）。
+
+### 影響範囲
+- 新規作成:
+  - `views/dictionary_view.py`
+  - `tests/test_dictionary_view.py`
+- 更新:
+  - `views/__init__.py`
+  - `AICHANGELOG.md`
+  - `Plan.md`
+
+
 
