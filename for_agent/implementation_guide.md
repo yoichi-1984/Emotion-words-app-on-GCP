@@ -4,6 +4,7 @@
 | 日付 | 版 | 改訂内容 | 作成・改訂者 |
 | :--- | :--- | :--- | :--- |
 | 2026-09-21 | 1.0 | 初版作成（モジュール構成、状態遷移、UI・DB・出題詳細設計の策定） | AI Pair Programmer |
+| 2026-09-21 | 1.1 | styles.py のUIコンポーネントヘルパー関数仕様（カード・バナー・バッジ・統計表示）の追記 | AI Pair Programmer |
 
 ---
 
@@ -191,7 +192,16 @@ div[role="radiogroup"] > label[data-checked="true"] {
 }
 ```
 
-### 5.3 各画面のUI仕様
+### 5.3 UIヘルパー関数群 (`styles.py`)
+* `apply_custom_styles()`: StreamlitアプリにカスタムCSSをインジェクト。
+* `render_badge(text, badge_type)`: 難易度（並・中・高）やカテゴリ用バッジHTMLを生成。
+* `render_question_card(content, label, subtext, category, difficulty)`: 問題文カードHTMLを生成。
+* `render_result_banner(is_correct, correct_word, correct_meaning)`: 回答判定結果バナーHTMLを生成。
+* `render_stat_card(label, value, subtext)`: 統計サマリーカードHTMLを生成。
+* `render_word_detail_card(word, reading, category, difficulty, meaning, example, point)`: 辞典・苦手ノート用単語詳細カードHTMLを生成。
+* `display_*`: 上記HTMLを `st.markdown(..., unsafe_allow_html=True)` で即時描画する各種表示ヘルパー。
+
+### 5.4 各画面のUI仕様
 
 #### 1. クイズ画面 (`views/quiz_view.py`)
 * **モード選択画面**:

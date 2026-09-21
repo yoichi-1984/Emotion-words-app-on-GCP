@@ -20,7 +20,7 @@
 - [x] 06. tests/test_quiz_logic.py の作成と pytest による出題・4択動的生成ロジック検証
 - [x] 07. db.py の実装（DatabaseInterface、WordStat 定義、LocalJsonDB モック実装）
 - [x] 08. tests/test_db.py の作成と pytest によるローカルモックDB読み書き検証
-- [ ] 09. styles.py の実装（パステルカラー、スマホ最適化ボタンスタイル、カスタムCSS）
+- [x] 09. styles.py の実装（パステルカラー、スマホ最適化ボタンスタイル、カスタムCSS）
 - [ ] 10. views/quiz_view.py の実装（モード選択、1問1答、ルビ確認、解説トグル、結果画面）
 - [ ] 11. views/review_view.py の実装（苦手ノート画面・間違えた問題一覧・集計ソート表示）
 - [ ] 12. views/dictionary_view.py の実装（心情語辞典画面・全272語検索・フィルタ・詳細展開）

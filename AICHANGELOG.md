@@ -381,3 +381,44 @@
 - 更新:
   - `AICHANGELOG.md`
   - `Plan.md`
+
+## [2026-09-21] - styles.py の実装および tests/test_styles.py の作成・検証
+
+### 作業概要
+中学受験生（小学生）にとって親しみやすく視認性の高いパステルカラーテーマ、スマートフォンでの操作性（親指タップ、押しやすいラジオボタン）に最適化したカスタムCSS、および各ビューで共通利用可能なUIコンポーネントHTML描画ヘルパーを `styles.py` に実装。併せて網羅的な単体テスト `tests/test_styles.py` を作成し、全79件の pytest 正常終了（Exit Code 0）を確認。
+
+### Before / After
+- **Before:**
+  - `styles.py` が存在せず、Streamlitデフォルトのスタイル（デスクトップ向けマージン、小さなラジオボタン、細いボタン等）のままであり、小学生向けの視認性・モバイル操作性・パステルカラーテーマが適用されていなかった。
+- **After:**
+  - `styles.py` を新規実装：
+    - **カラーパレット定数**: 知的なフォレストグリーン（`#2E7D32`）、信頼感のあるブルー（`#1976D2`）、パステル背景（`#E8F5E9`, `#E3F2FD`）、正解・不正解カラー、難易度別カラー辞書（`DIFF_COLORS`）の定義。
+    - **カスタムCSS (`CUSTOM_CSS`)**:
+      - 親指タップに配慮したボタンスタイル（`min-height: 52px`, `border-radius: 12px`, タップ時アニメーション）。
+      - 押しやすくカード化された4択ラジオボタン（`div[role="radiogroup"] > label`）、選択時ハイライト（`#4CAF50`, `#E8F5E9`）。
+      - 問題文カード（`.question-card`）、正解・不正解結果バナー（`.result-banner-correct`, `.result-banner-incorrect`）、難易度・カテゴリバッジ（`.badge`）、統計サマリーカード（`.stat-card`）、単語詳細カード（`.word-detail-card`）。
+      - スマホ画面での余白最適化（`.block-container`）。
+    - **HTMLレンダリングヘルパー**:
+      - `apply_custom_styles()`, `get_custom_css()`
+      - `render_badge(text, badge_type)`
+      - `render_question_card(content, label, subtext, category, difficulty)`
+      - `render_result_banner(is_correct, correct_word, correct_meaning)`
+      - `render_stat_card(label, value, subtext)`
+      - `render_word_detail_card(word, reading, category, difficulty, meaning, example, point)`
+    - **Streamlit直接描画ヘルパー**:
+      - `display_question_card()`, `display_result_banner()`, `display_stat_card()`, `display_word_detail_card()`
+    - XSS対策としてすべての動的入力値に対して `html.escape` を徹底。
+  - `tests/test_styles.py` を新規作成（15テストケース）：
+    - カラー定数フォーマット、CSS要件（ボタンサイズ、角丸、セレクタ）、モックを用いた `st.markdown(unsafe_allow_html=True)` 呼び出し、HTMLエスケープ、各種バッジ・カード・バナー生成ロジックを検証。
+  - `for_agent/implementation_guide.md` のUIコンポーネント仕様を同期更新。
+  - `python -m py_compile styles.py tests/test_styles.py` および `pytest`（全79テスト）がすべてパス。
+
+### 影響範囲
+- 新規作成:
+  - `styles.py`
+  - `tests/test_styles.py`
+- 更新:
+  - `for_agent/implementation_guide.md`
+  - `AICHANGELOG.md`
+  - `Plan.md`
+
