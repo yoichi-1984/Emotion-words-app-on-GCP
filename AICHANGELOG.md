@@ -352,7 +352,32 @@
   - `db.py`
 - 更新:
   - `quiz_logic.py`
+## [2026-09-21] - tests/test_db.py の作成と pytest によるローカルモックDB読み書き検証
+
+### 作業概要
+`db.py` の学習履歴モデル（`WordStat`）、インターフェース（`DatabaseInterface`）、ローカルJSONモック実装（`LocalJsonDB`）、およびファクトリ関数（`get_db`）を対象とする単体テストスイート `tests/test_db.py` を新規作成。全24テストケースを実装し、pytest による全テスト（計64件）の正常終了（Exit Code 0）を確認。
+
+### Before / After
+- **Before:**
+  - `db.py` の単体テストが存在せず、`LocalJsonDB` のファイル自動生成・JSON読み書き・データマージ・回答履歴更新・不正解フラグ永続化・ユーザーデータリセット・マルチスレッド並行書き込みの堅牢性が自動テストで検証されていなかった。
+- **After:**
+  - `tests/test_db.py` を新規作成（計24テストケース）。
+  - 主な検証項目：
+    1. `WordStat` の初期値、`to_dict()` および `from_dict()` の相互変換・型変換・デフォルト補完
+    2. JSTタイムスタンプ文字列のフォーマット検証
+    3. `LocalJsonDB` の初期化時におけるディレクトリ・ファイル自動生成、初期データ構造、破損JSON時のフォールバック処理
+    4. `get_user_stats` による全272語のデフォルト値補完および学習履歴のマージ
+    5. `record_attempt` による正解・不正解時の統計更新（回数、不正解率の四捨五入、過去不正解フラグの不可逆的保持）
+    6. 別DBインスタンスによるJSONファイル永続化・再読み込みの整合性
+    7. `get_failed_words_stats` による間違えた単語の抽出・No順ソート・ユーザー間分離
+    8. `reset_user_stats` による特定ユーザーの学習履歴リセットと他ユーザーデータの不干渉
+    9. `get_db` ファクトリ関数（引数指定、環境変数 `DEV_MODE` 連動）の動作
+    10. `ThreadPoolExecutor` を用いた並行書き込み時のスレッドセーフティ
+  - `pytest` を実行し、全64テスト（`test_data_loader.py`: 15件, `test_db.py`: 24件, `test_quiz_logic.py`: 25件）が100%成功（Exit Code 0）。
+
+### 影響範囲
+- 新規作成:
+  - `tests/test_db.py`
+- 更新:
   - `AICHANGELOG.md`
   - `Plan.md`
-
-
