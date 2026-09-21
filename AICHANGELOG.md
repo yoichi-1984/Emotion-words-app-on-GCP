@@ -104,4 +104,22 @@
   - `Plan.md`
   - `AICHANGELOG.md`
 
+## [2026-09-21] - アプリケーション要件定義書の策定および合意形成
 
+### 作業概要
+ユーザーへのヒアリングおよびディスカッションに基づき、中学受験国語・心情語対策アプリケーションの要件定義書を作成。技術スタック（Streamlit / Cloud Run / Cloud Firestore / Google OAuth 2.0）、データモデル、画面設計、クイズ出題ロジック（4択動的生成）、セキュリティ・運用方針を策定し、`for_agent/requirements.md` としてドキュメント化。
+
+### Before / After
+- **Before:** アプリケーションの仕様・技術構成・画面設計が未確定の構想段階。`for_agent/` ディレクトリが存在しない状態。
+- **After:**
+  - `for_agent/requirements.md`（要件定義書初版）を作成・保存。
+  - フロントエンドに Streamlit、DBに Cloud Firestore、認証に Google OAuth 2.0（Gmailホワイトリスト方式）、ホスティングに Cloud Run を選定。
+  - クイズ仕様（2モード、全カテゴリからのダミー動的生成、10問セッション、ルビ確認、解説トグル、苦手ノート、心情語辞典）を確定。
+  - 全272語・最大5名の家族利用における Firestore 容量・無料枠内運用の妥当性を検証・確認。
+
+### 影響範囲
+- 新規作成:
+  - `for_agent/requirements.md`
+- 更新:
+  - `Plan.md`
+  - `AICHANGELOG.md`
