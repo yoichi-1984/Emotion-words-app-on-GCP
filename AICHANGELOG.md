@@ -123,3 +123,26 @@
 - 更新:
   - `Plan.md`
   - `AICHANGELOG.md`
+
+## [2026-09-21] - 実装指示書（詳細設計・実装仕様書）の策定
+
+### 作業概要
+ユーザーからの詳細決定事項（苦手復習モードの10問以上開放条件、回答確定ボタン方式、GCPコンソールでのデータ管理、DEV_MODEによるローカルモック検証、小学生向けパステルUI）を網羅した実装指示書（詳細設計・実装仕様書）を作成。モジュール構成、状態遷移、データ型、出題・判定アルゴリズム、スマホ最適化CSS、DBインターフェース、テスト計画を策定し、`for_agent/implementation_guide.md` としてドキュメント化。
+
+### Before / After
+- **Before:** 要件定義書（ハイレベルな仕様）のみが存在し、具体的なコード設計（モジュール分割、状態変数、データ型、CSS詳細）が未定義な状態。
+- **After:**
+  - `for_agent/implementation_guide.md` を作成。
+  - ディレクトリ構成、`WordItem` / `WordStat` / `QuizSession` の型定義、`quiz_logic.py` の出題・4択動的生成・判定アルゴリズムを詳細化。
+  - `st.session_state` のキースキーマおよび画面遷移フローを確定。
+  - スマホ最適化CSS（パステルカラー、親指タップ対応のmin-height:52pxボタン）を設計。
+  - `DEV_MODE=True` によるローカルモックDB（JSON）/モック認証設計により、GCP未設定環境でも即座に動作検証可能な体制を確立。
+  - `for_agent/requirements.md` を1.1版に改訂し、詳細決定事項と同期。
+
+### 影響範囲
+- 新規作成:
+  - `for_agent/implementation_guide.md`
+- 更新:
+  - `for_agent/requirements.md`
+  - `Plan.md`
+  - `AICHANGELOG.md`
