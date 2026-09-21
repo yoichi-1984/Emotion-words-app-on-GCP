@@ -556,5 +556,50 @@
   - `AICHANGELOG.md`
   - `Plan.md`
 
+---
 
+## 2026-09-21: Phase 2 - タスク13: app.py の実装（サイドバー開閉ナビゲーション、セッション状態管理、ローカルモック認証）
 
+### 概要
+アプリケーションのメインエントリーポイントである `app.py` を新規実装。ページ初期設定（Streamlitページ設定およびスマホ最適化カスタムCSS注入）、セッション状態管理（認証状態、ユーザー情報、画面切り替え状態）、ローカル開発用モック認証（`DEV_MODE=True` での自動ログイン・複数テストアカウント切り替え機能）、開閉可能なサイドバーナビゲーション（クイズ・苦手ノート・辞典の切り替え、ユーザープロファイル表示、学習履歴初期化ツール、ログアウト機能）、および未認証時のログイン画面を描画するメインルーティング機構を構築した。さらに単体テスト `tests/test_app.py` を新規作成し、全139件の pytest テストがすべて正常終了（Exit Code 0）することを確認。
+
+### Before / After
+- **Before:**
+  - 各種 View コンポーネント（`views/quiz_view.py`, `views/review_view.py`, `views/dictionary_view.py`）やバックエンド層（`data_loader.py`, `db.py`, `styles.py`）は整備されていたが、これらを統合して実行するメインエントリーポイント `app.py` が未実装であった。
+  - セッション全体の状態管理や、画面遷移のためのナビゲーション、ローカル開発・テストを円滑に進めるためのモック認証機構が存在しなかった。
+- **After:**
+  - `app.py` を新規実装：
+    - **ページ初期設定**:
+      - `st.set_page_config` によりタイトル「中学受験 心情語マスター」、アイコン「📖」、中央揃えレイアウト、サイドバー自動開閉を設定。
+      - `apply_custom_styles()` を呼び出してスマートフォン最適化CSS・パステルカラーテーマを適用。
+    - **環境判定 & 認証ヘルパー**:
+      - `is_dev_mode()`: 環境変数 `DEV_MODE` に基づきローカル開発モードか本番かを判定。
+      - `get_allowed_emails()`: 環境変数 `ALLOWED_EMAILS` のカンマ区切り文字列をパース。
+      - `init_app_session_state()`: `is_authenticated`, `user_email`, `current_view` などの基本セッションキーを初期化。
+      - `switch_view(view_key)`: 画面（`quiz`, `review`, `dictionary`）の安全な切り替え。
+      - `logout()`: セッション認証フラグを False に更新し、画面をリセット。
+      - `login_as_dev_user(email)`: 開発用アカウントでの即時ログイン。
+    - **UIコンポーネント**:
+      - `render_login_screen()`: 未認証時に表示するログイン画面。DEV_MODE時はプリセットアカウント選択または任意メール入力によるワンクリックログインを提供。本番モード（DEV_MODE=False）ではGoogle認証案内を表示。
+      - `render_sidebar(db, user_email)`: サイドバー上部にアプリタイトル、ログインユーザー情報バナー（開発モード/認証済バッジ付き）を表示。ラジオボタンによる3画面（クイズ・苦手ノート・心情語辞典）の切り替え。DEV_MODE時はアコーディオン内にユーザー切り替えと学習履歴初期化ツールを配置。最下部にログアウトボタンを設置。
+      - `render_main_content(db, user_email, all_words)`: 現在の `current_view` に応じて各 View 関数（`render_quiz_view`, `render_review_view`, `render_dictionary_view`）を呼び出し、不正キー時はクイズ画面へ安全にフォールバック。
+      - `main()`: エントリーポイント。初期設定・CSS適用・セッション初期化・データロード・DB接続・認証ルーティングを統合。
+  - `tests/test_app.py` を新規作成（全13テストケース）：
+    - `test_is_dev_mode`: 各種真偽値文字列（True/true/1/False/0/no）の判定検証。
+    - `test_get_allowed_emails`: カンマ区切りパースおよび空文字処理の検証。
+    - `test_init_app_session_state_dev_mode_true` / `false`: 開発モード・本番モードでの初期セッション状態の検証。
+    - `test_switch_view`: 画面遷移および不正キー無視の検証。
+    - `test_logout`: ログアウト時の状態初期化の検証。
+    - `test_login_as_dev_user`: 開発ログイン時のセッション更新検証。
+    - `test_render_main_content_quiz` / `review` / `dictionary` / `fallback`: ビュー切り替え時の各 View コンポーネント呼び出しとフォールバックの検証。
+    - `test_render_login_screen_dev`: DEV_MODE 時のログイン画面描画検証。
+    - `test_render_sidebar`: サイドバー描画処理の検証。
+  - 構文チェック `python -m py_compile` および `pytest`（全139テスト）がすべてパス（Exit Code 0）。
+
+### 影響範囲
+- 新規作成:
+  - `app.py`
+  - `tests/test_app.py`
+- 更新:
+  - `AICHANGELOG.md`
+  - `Plan.md`

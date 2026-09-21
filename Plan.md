@@ -24,7 +24,7 @@
 - [x] 10. views/quiz_view.py の実装（モード選択、1問1答、ルビ確認、解説トグル、結果画面）
 - [x] 11. views/review_view.py の実装（苦手ノート画面・間違えた問題一覧・集計ソート表示）
 - [x] 12. views/dictionary_view.py の実装（心情語辞典画面・全272語検索・フィルタ・詳細展開）
-- [ ] 13. app.py の実装（サイドバー開閉ナビゲーション、セッション状態管理、ローカルモック認証）
+- [x] 13. app.py の実装（サイドバー開閉ナビゲーション、セッション状態管理、ローカルモック認証）
 - [ ] 14. アプリケーション全体のローカル結合検証（py_compile および pytest）
 - [ ] 15. auth.py の実装（Google OAuth 2.0 Webフロー & Gmailホワイトリスト検証）
 - [ ] 16. db.py への FirestoreDB 実装の追加（Cloud Firestore 連携）
