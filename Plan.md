@@ -17,7 +17,7 @@
 - [x] 03. data_loader.py の実装（WordItem 定義、all_words.csv 読み込み、キャッシュ関数）
 - [x] 04. tests/test_data_loader.py の作成と pytest による単語データ整合性検証
 - [x] 05. quiz_logic.py の実装（4択動的生成、10問サンプリング、正誤判定ロジック）
-- [ ] 06. tests/test_quiz_logic.py の作成と pytest による出題・4択動的生成ロジック検証
+- [x] 06. tests/test_quiz_logic.py の作成と pytest による出題・4択動的生成ロジック検証
 - [ ] 07. db.py の実装（DatabaseInterface、WordStat 定義、LocalJsonDB モック実装）
 - [ ] 08. tests/test_db.py の作成と pytest によるローカルモックDB読み書き検証
 - [ ] 09. styles.py の実装（パステルカラー、スマホ最適化ボタンスタイル、カスタムCSS）

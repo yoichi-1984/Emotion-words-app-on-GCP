@@ -297,3 +297,35 @@
 - 更新:
   - `Plan.md`
   - `AICHANGELOG.md`
+
+## [2026-09-21] - tests/test_quiz_logic.py の作成と pytest による出題・4択動的生成ロジック検証
+
+### 作業概要
+`quiz_logic.py` の各機能（データモデル、出題サンプリング、苦手復習モード開放条件、4択動的生成・シャッフル、正誤判定、統計更新、苦手単語抽出）を検証する単体テストスイート `tests/test_quiz_logic.py` を作成。pytest を実行し、全40件（既存15件＋新規25件）のテストがすべて合格（Exit Code 0）することを確認。
+
+### Before / After
+- **Before:**
+  - `quiz_logic.py` の実装に対する自動単体テストが存在せず、ランダムサンプリングや4択動的生成（正解・ダミー重複防止、シャッフル分布）、統計更新の永続性等の回帰検証が自動化されていなかった。
+- **After:**
+  - `tests/test_quiz_logic.py` を新規作成（計25テストケース）。
+  - 主な検証項目：
+    1. `WordStat.to_dict()` および `QuizQuestion.to_dict()` のデータ保持とシリアライズ完全性
+    2. `get_current_jst_iso()` による JST (+09:00) タイムスタンプ取得
+    3. `select_quiz_words()` の重複なしサンプリングおよび要素不足時の例外発生
+    4. `can_start_review_mode()` および `select_review_words()` の10問未満ガード条件
+    5. モード1（心情語→意味）およびモード2（意味→心情語）の4択動的生成（正解が必ず1つ、ダミー3つと重複なし、正解インデックス一致）
+    6. 4択シャッフルにおける正解配置（0〜3）のランダム分布検証
+    7. 不正なモードやダミー不足時の例外処理
+    8. `create_quiz_question()` / `build_quiz_session()` による問題構築
+    9. `evaluate_answer()` による完全一致・前後の余白トリム照合
+    10. `update_word_stat()` による初回正解・初回不正解・過去不正解フラグ永続化・不正解率四捨五入（0.333など）の計算精度
+    11. `extract_failed_words()` による間違えた単語のマスター順抽出
+  - `pytest` を実行し、全40テスト（`test_data_loader.py`: 15件, `test_quiz_logic.py`: 25件）が100%成功（Exit Code 0）。
+
+### 影響範囲
+- 新規作成:
+  - `tests/test_quiz_logic.py`
+- 更新:
+  - `Plan.md`
+  - `AICHANGELOG.md`
+
