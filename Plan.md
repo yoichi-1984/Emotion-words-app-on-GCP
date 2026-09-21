@@ -12,7 +12,7 @@
 - [x] ループエンジニアリング基盤の配備（AGENTS.md, .agents/skills/）
 
 ### フェーズ2: アプリケーション実装ループ（Phase 2: Coding Loop）
-- [ ] 01. requirements.txt の作成（Streamlit, pytest 等）および仮想環境依存パッケージの整備
+- [x] 01. requirements.txt の作成（Streamlit, pytest 等）および仮想環境依存パッケージの整備
 - [ ] 02. .env.example の作成および .gitignore の更新（.env, local_data/ 等の機密・一時ファイル除外）
 - [ ] 03. data_loader.py の実装（WordItem 定義、all_words.csv 読み込み、キャッシュ関数）
 - [ ] 04. tests/test_data_loader.py の作成と pytest による単語データ整合性検証

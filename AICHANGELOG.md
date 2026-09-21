@@ -175,3 +175,23 @@
 - 更新:
   - `Plan.md`
   - `AICHANGELOG.md`
+
+## [2026-09-21] - requirements.txt の作成および仮想環境依存パッケージの整備
+
+### 作業概要
+アプリケーション実行・テストに必要な依存ライブラリ一覧（Streamlit, pandas, pytest, python-dotenv, google-cloud-firestore, google-auth, google-auth-oauthlib, requests）を定義した `requirements.txt` を新規作成。仮想環境 `env` に全パッケージをインストールし、正常なインポートを検証。
+
+### Before / After
+- **Before:** `requirements.txt` が未作成で、仮想環境 `env` には `pip` のみが存在する状態。
+- **After:**
+  - `requirements.txt` を作成（Streamlit 1.40+, pandas 2.0+, pytest 8.0+, google-cloud-firestore, OAuth 関連パッケージを定義）。
+  - `pip install -r requirements.txt` を実行し、全依存関係を仮想環境に正常導入完了。
+  - Pythonスクリプトによる各モジュールのインポート検証（Exit Code 0）を確認済み。
+
+### 影響範囲
+- 新規作成:
+  - `requirements.txt`
+- 更新:
+  - `Plan.md`
+  - `AICHANGELOG.md`
+
