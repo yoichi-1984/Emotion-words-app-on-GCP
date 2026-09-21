@@ -28,7 +28,7 @@
 - [x] 14. アプリケーション全体のローカル結合検証（py_compile および pytest）
 - [x] 15. auth.py の実装（Google OAuth 2.0 Webフロー & Gmailホワイトリスト検証）
 - [x] 16. db.py への FirestoreDB 実装の追加（Cloud Firestore 連携）
-- [ ] 17. Dockerfile の作成および Cloud Run デプロイ設定の整備
+- [x] 17. Dockerfile の作成および Cloud Run デプロイ設定の整備
 
 ### フェーズ3: 検品・同期（Phase 3: Review & Sync）
 - [ ] 全機能の回帰テスト実行・仕様書（for_agent/）との完全同期点検

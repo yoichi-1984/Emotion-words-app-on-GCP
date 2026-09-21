@@ -290,7 +290,8 @@ class FirestoreDB(DatabaseInterface):
             client: 外部から注入する firestore.Client（テストモック用）
             words_loader: 単語マスターデータ取得関数（未指定時は data_loader.load_words）
         """
-        self.project_id = project_id or os.getenv("GCP_PROJECT_ID")
+        raw_proj = project_id if project_id is not None else os.getenv("GCP_PROJECT_ID", "")
+        self.project_id = raw_proj.strip().strip('"\'') if raw_proj else None
         self.words_loader = words_loader or load_words
         self._client = client
 
@@ -461,8 +462,11 @@ def get_db(
         DatabaseInterface: DBアクセスクライアント (LocalJsonDB または FirestoreDB)
     """
     if dev_mode is None:
-        dev_mode_env = os.getenv("DEV_MODE", "True").lower()
-        dev_mode = dev_mode_env in ("true", "1", "t", "yes")
+        dev_mode_env = os.getenv("DEV_MODE", "True").strip().lower()
+        if not dev_mode_env:
+            dev_mode = True
+        else:
+            dev_mode = dev_mode_env in ("true", "1", "t", "yes")
 
     if dev_mode:
         return LocalJsonDB(filepath=json_path)

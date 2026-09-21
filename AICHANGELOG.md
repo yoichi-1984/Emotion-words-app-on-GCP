@@ -708,4 +708,59 @@ Google OAuth 2.0 Web フローおよび Gmail アカウントのホワイトリ�
   - `Plan.md`
   - `AICHANGELOG.md`
 
+---
+
+## 2026-09-21: Phase 2 - タスク17: Dockerfile の作成および Cloud Run デプロイ設定の整備
+
+### 概要
+`for_agent/requirements.md` および `for_agent/implementation_guide.md` の仕様に基づき、Google Cloud Run 本番デプロイ用の `Dockerfile`、ビルド最適化・機密保護用 `.dockerignore`、Streamlit サーバー設定 `.streamlit/config.toml`、Windows/Linux 両対応の自動デプロイスクリプト（`deploy.ps1`, `deploy.sh`）、および詳細運用手順書（`docs/cloud_run_deployment.md`）を整備した。
+また、`env/gcp.env` に格納された GCP / OAuth 設定値との整合性向上として、`auth.py`, `db.py`, `app.py` における環境変数の引用符除去や空文字デフォルト処理、`python-dotenv` 自動ロードを追加。単体テスト（`tests/test_deployment.py`）を新設し、全182件のテスト正常終了（Exit Code 0）を確認した。
+
+### Before / After
+- **Before:**
+  - `Dockerfile`, `.dockerignore`, `.streamlit/config.toml` が存在せず、Cloud Run デプロイ用のコンテナビルド定義が未配備だった。
+  - デプロイ自動化スクリプトがなく、手動デプロイおよび OAuth 2.0 リダイレクト URI の設定手順が未整理だった。
+  - `auth.py` や `db.py` において、`.env` 内でダブルクォーテーション等で囲まれた環境変数や空文字の `DEV_MODE` のハンドリングが不十分だった。
+- **After:**
+  - `Dockerfile` を新規作成:
+    - ベースイメージ: `python:3.11-slim`（軽量かつセキュア）。
+    - ポート設定: `PORT=8080`, `EXPOSE 8080`（Cloud Run 仕様準拠）。
+    - ヘルスチェック: `HEALTHCHECK CMD curl --fail http://localhost:${PORT:-8080}/_stcore/health || exit 1`。
+    - 起動コマンド: `exec streamlit run app.py --server.port=${PORT:-8080} --server.address=0.0.0.0 --server.enableCORS=false --server.enableXsrfProtection=false --server.headless=true`（Cloud Run 動的ポート・シグナル伝搬対応）。
+  - `.dockerignore` を新規作成:
+    - `.git`, `__pycache__`, `.venv`, `env/`, `tests/`, `.pytest_cache/`, `local_data/`, `credentials.json`, `*.env` 等の機密・不要ファイルを除外。単語マスターCSV（`raw_data/word-list/all_words.csv`）は保持。
+  - `.streamlit/config.toml` を新規作成:
+    - ポート8080、headless=true、address=0.0.0.0、CORS/XSRF無効化、パステルカラーテーマを定義。
+  - `deploy.ps1` (PowerShell) および `deploy.sh` (Bash) を新規作成:
+    - `env/gcp.env` を自動解析し、`gcloud run deploy --source .` を実行。
+    - コールドスタート対応・低コスト運用（`--min-instances 0 --max-instances 2 --memory 512Mi --cpu 1`）。
+    - デプロイ後にサービスURLを即時取得し、OAuth 2.0 承認済みリダイレクトURI（`${serviceUrl}/`）への自動更新およびコンソール設定案内を出力。
+    - `-DryRun` オプションに対応。
+  - `docs/cloud_run_deployment.md` および `README.md` を作成・更新:
+    - デプロイ詳細手順、OAuth 2.0 リダイレクト URI 登録手順、Firestore 連携確認、保守ログ監視コマンドを文書化。
+  - `app.py`, `auth.py`, `db.py` を更新:
+    - `app.py` に `dotenv.load_dotenv` を追加し、ローカル起動時に `env/gcp.env` を自動ロード。
+    - `auth.py` および `db.py` で環境変数のクォートトリム（`.strip('"\'')`）および空文字 DEV_MODE 時の安全なフォールバックを実装。
+  - `tests/test_deployment.py` を新規作成（5テスト）:
+    - Dockerfile、.dockerignore、config.toml、deploy スクリプト、引用符トリム・未設定処理の妥当性を網羅的にテスト。
+  - 全182件の pytest テストおよび全 Python ファイルの py_compile がすべて正常終了（Exit Code 0）。
+
+### 影響範囲
+- 新規作成:
+  - `Dockerfile`
+  - `.dockerignore`
+  - `.streamlit/config.toml`
+  - `deploy.ps1`
+  - `deploy.sh`
+  - `docs/cloud_run_deployment.md`
+  - `tests/test_deployment.py`
+- 更新:
+  - `app.py`
+  - `auth.py`
+  - `db.py`
+  - `README.md`
+  - `for_agent/implementation_guide.md`
+  - `Plan.md`
+  - `AICHANGELOG.md`
+
 

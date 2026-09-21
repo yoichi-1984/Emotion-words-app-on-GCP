@@ -10,6 +10,16 @@ import os
 from typing import List, Optional
 import streamlit as st
 
+# 環境変数の読み込み (.env または env/gcp.env があれば自動ロード)
+try:
+    from dotenv import load_dotenv
+
+    load_dotenv()
+    if os.path.exists("env/gcp.env"):
+        load_dotenv("env/gcp.env")
+except ImportError:
+    pass
+
 from auth import (
     authenticate_user,
     get_allowed_emails,

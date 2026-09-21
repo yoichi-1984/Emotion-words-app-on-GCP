@@ -41,8 +41,11 @@ def is_dev_mode() -> bool:
 
     Returns:
         bool: DEV_MODE 環境変数が True / 1 / t / yes の場合は True、それ以外は False。
+              未設定または空文字の場合はローカル開発の安全のため True を返却。
     """
     dev_mode_env = os.getenv("DEV_MODE", "True").strip().lower()
+    if not dev_mode_env:
+        return True
     return dev_mode_env in ("true", "1", "t", "yes")
 
 
@@ -50,6 +53,7 @@ def get_allowed_emails() -> List[str]:
     """ホワイトリストに登録された許可メールアドレス一覧を取得する。
 
     大文字・小文字のブレを防止するため、すべて小文字に正規化して返す。
+    環境変数に含まれる引用符（" または '）も自動除去する。
 
     Returns:
         List[str]: 正規化された許可メールアドレスのリスト
@@ -57,7 +61,7 @@ def get_allowed_emails() -> List[str]:
     raw_emails = os.getenv("ALLOWED_EMAILS", "")
     if not raw_emails:
         return []
-    return [e.strip().lower() for e in raw_emails.split(",") if e.strip()]
+    return [e.strip().strip('"\'').lower() for e in raw_emails.split(",") if e.strip().strip('"\'')]
 
 
 def is_email_allowed(email: str, allowed_emails: Optional[List[str]] = None) -> bool:
@@ -88,9 +92,9 @@ def get_oauth_config() -> Dict[str, Any]:
     Returns:
         Dict[str, Any]: OAuth設定辞書 (client_id, client_secret, redirect_uri, is_configured)
     """
-    client_id = os.getenv("GOOGLE_CLIENT_ID", "").strip()
-    client_secret = os.getenv("GOOGLE_CLIENT_SECRET", "").strip()
-    redirect_uri = os.getenv("REDIRECT_URI", "").strip()
+    client_id = os.getenv("GOOGLE_CLIENT_ID", "").strip().strip('"\'')
+    client_secret = os.getenv("GOOGLE_CLIENT_SECRET", "").strip().strip('"\'')
+    redirect_uri = os.getenv("REDIRECT_URI", "").strip().strip('"\'')
 
     # プレースホルダーまたは空文字列でないことを検証
     placeholder_tokens = ("your-client-id", "your-client-secret", "your-cloud-run-url")

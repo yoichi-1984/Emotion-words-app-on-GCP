@@ -304,10 +304,17 @@ ALLOWED_EMAILS=owner@gmail.com,family1@gmail.com
 GCP_PROJECT_ID=your-gcp-project-id
 ```
 
-### 8.2 Cloud Run 用 Dockerfile 仕様
-* ベースイメージ: `python:3.11-slim`
-* ポート: 8080（Cloud Run標準）
-* 起動コマンド: `streamlit run app.py --server.port=8080 --server.address=0.0.0.0 --server.enableCORS=false --server.enableXsrfProtection=false`
+### 8.2 Cloud Run 用 Dockerfile & デプロイ仕様
+* **ベースイメージ**: `python:3.11-slim`（軽量かつ高セキュリティ）
+* **ポート**: 8080（Cloud Run 標準 `PORT` 環境変数）
+* **ヘルスチェック**: `HEALTHCHECK CMD curl --fail http://localhost:${PORT:-8080}/_stcore/health || exit 1`
+* **起動コマンド**: `exec streamlit run app.py --server.port=${PORT:-8080} --server.address=0.0.0.0 --server.enableCORS=false --server.enableXsrfProtection=false --server.headless=true`
+* **サーバー設定**: `.streamlit/config.toml` にポート8080、headless=true、パステルテーマ、統計送信無効化を定義。
+* **ビルド除外**: `.dockerignore` により `.env`, `env/`, `local_data/`, `credentials.json`, `tests/`, `.git/` 等の機密・一時ファイルを除外。
+* **自動デプロイスクリプト**:
+  * `deploy.ps1` (Windows PowerShell): `env/gcp.env` を読み込み、`gcloud run deploy --source .` を実行。サービスURL取得およびリダイレクトURI更新に対応。
+  * `deploy.sh` (Linux / macOS / Cloud Shell): 同等の Bash デプロイスクリプト。
+* **詳細運用手順**: [docs/cloud_run_deployment.md](../docs/cloud_run_deployment.md) に記載。
 
 ---
 

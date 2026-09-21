@@ -1,0 +1,62 @@
+# ==============================================================================
+# Docker ビルドコンテキスト除外設定 (.dockerignore)
+# 不要ファイルおよび機密情報のコンテナイメージ混入を防止
+# ==============================================================================
+
+# バージョン管理
+.git
+.gitignore
+.gitattributes
+
+# Python キャッシュ & ビルド成果物
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# 仮想環境
+.venv/
+venv/
+env/
+ENV/
+
+# テスト & カバレッジ成果物
+.pytest_cache/
+.coverage
+htmlcov/
+tests/
+
+# 機密情報・環境変数・ローカルモックデータ
+.env
+*.env
+local_data/
+*service_account*.json
+credentials.json
+secrets.yaml
+.streamlit/secrets.toml
+
+# エージェント・計画ドキュメント
+.gemini/
+.agents/
+Plan.md
+AICHANGELOG.md
+
+# アプリ実行に不要な原本・中間ドキュメント（raw_data/word-list/all_words.csv はコンテナ内に保持）
+raw_data/raw.docx
+raw_data/raw.md
+raw_data/report.md
+old/
+
+# エディタ・IDE 設定
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Dockerfile 自身
+Dockerfile
+.dockerignore
