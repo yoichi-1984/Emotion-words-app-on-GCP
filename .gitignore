@@ -216,3 +216,9 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Application specific / Local mock data & credentials
+local_data/
+*service_account*.json
+credentials.json
+secrets.yaml

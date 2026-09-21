@@ -195,3 +195,24 @@
   - `Plan.md`
   - `AICHANGELOG.md`
 
+## [2026-09-21] - .env.example の作成および .gitignore の更新
+
+### 作業概要
+アプリケーション設定用の環境変数テンプレートファイル `.env.example` を新規作成し、ローカル開発用モックデータ保存ディレクトリ（`local_data/`）およびサービスアカウントキー・クレデンシャルファイルを Git 管理から除外するよう `.gitignore` を更新。
+
+### Before / After
+- **Before:**
+  - `.env.example` が存在せず、必要な環境変数の形式（DEV_MODE, Google OAuth, Firestore 設定）が明示されていない。
+  - `.gitignore` にローカルモックデータ用ディレクトリ `local_data/` やサービスアカウントキー（`*service_account*.json`, `credentials.json`, `secrets.yaml`）の除外設定が明示的に記載されていない。
+- **After:**
+  - `.env.example` を作成し、`DEV_MODE=True`、Google OAuth 関連設定、`ALLOWED_EMAILS`、`GCP_PROJECT_ID` などの環境変数定義を明記。
+  - `.gitignore` に `local_data/`、`*service_account*.json`、`credentials.json`、`secrets.yaml` の除外設定を追記。
+
+### 影響範囲
+- 新規作成:
+  - `.env.example`
+- 更新:
+  - `.gitignore`
+  - `Plan.md`
+  - `AICHANGELOG.md`
+
