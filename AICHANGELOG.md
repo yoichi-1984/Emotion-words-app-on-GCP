@@ -467,4 +467,48 @@
   - `AICHANGELOG.md`
   - `Plan.md`
 
+---
+
+## 2026-09-21: Phase 2 - タスク11: views/review_view.py の実装（苦手ノート画面・間違えた問題一覧・集計ソート表示）
+
+### 概要
+苦手ノート画面のUIおよび集計・ソートロジックを提供する `views/review_view.py` を新規実装。過去に1回以上間違えた問題（`has_ever_failed == True`）の一覧表示、サマリー統計（苦手語句数、総出題数、総合不正解率）、ソート機能（不正解回数順、不正解率順、単語番号順、カテゴリ順、最近解いた順）、キーワード検索・カテゴリ絞り込み、単語詳細カードアコーディオン展開、および「苦手復習モード」開放案内メッセージを完備した。さらに、単体テスト `tests/test_review_view.py` を新規作成し、全107件の pytest テストが正常終了（Exit Code 0）することを確認。
+
+### Before / After
+- **Before:**
+  - `views/review_view.py` が存在せず、過去に間違えた問題の一覧や弱点克服のための復習画面が未実装であった。
+  - 間違えた問題のサマリー集計、ソート（不正解回数順・率順等）、キーワード検索のロジックが存在しなかった。
+- **After:**
+  - `views/review_view.py` を新規実装：
+    - **データモデル**: `ReviewItem`（`WordStat` と `WordItem` を結合した読み取り専用モデル。単語情報と学習履歴を統合）。
+    - **ビジネスロジック関数**:
+      - `build_review_items(stats, all_words)`: 過去に間違えた単語（`has_ever_failed == True`）をマスターデータと突合し `ReviewItem` のリストを生成。
+      - `calculate_review_summary(items)`: 苦手語句数、総出題回数、総不正解数、総合不正解率（%）を集計。
+      - `filter_and_sort_review_items(items, sort_by, category_filter, search_query)`: 単語名・読み・意味の全文検索、カテゴリ絞り込み、5種類のソート（不正解回数が多い順、不正解率が高い順、単語番号順、カテゴリ順、最近解いた順）を適用。
+      - `format_attempt_time(iso_str)`: ISO 8601日時を見やすい形式（`YYYY/MM/DD HH:MM`）にフォーマット。
+    - **UIレンダリング関数**:
+      - `render_review_view(db, user_email, all_words)`: メイン描画エントリーポイント。
+      - **エンプティステート**: 苦手単語が0件のとき、クイズ挑戦を促すインフォメーションを表示。
+      - **サマリー統計カード**: 3列で「苦手語句数」「総出題回数」「総合不正解率」を分かりやすく提示。
+      - **苦手復習モード案内**: 間違えた問題が10語以上蓄積されている場合はクイズへの誘導メッセージ、10語未満の場合は現在の進捗（例: `3 / 10 語`）と開放条件を案内。
+      - **コントロールバー**: 検索テキスト入力、カテゴリ選択プルダウン、ソート選択プルダウンを配置。
+      - **単語アコーディオン一覧**: 各単語のヘッダーに直近正誤アイコン（🟢/🔴）、単語名、読み仮名、不正解回数/総出題回数/不正解率を表示。アコーディオン展開時に難易度・カテゴリバッジ、最終出題日時、および意味・場面例・つまずきポイントの詳細カード（`display_word_detail_card`）を明示。
+  - `views/__init__.py` に `render_review_view` のエクスポートを追加。
+  - `tests/test_review_view.py` を新規作成（全15テストケース）：
+    - `build_review_items`: `has_ever_failed` フィルタリング、属性アクセス、存在しない単語の除外テスト。
+    - `calculate_review_summary`: 空リスト時および複数アイテム時の集計正確性テスト。
+    - `filter_and_sort_review_items`: カテゴリフィルタ、単語・読み・意味検索、5種類のソートロジックの網羅的テスト。
+    - `format_attempt_time`: 日時フォーマット・例外値処理のテスト。
+    - `render_review_view`: 0件時、10件未満時、10件以上時の描画分岐テスト。
+  - 構文チェック `python -m py_compile` および `pytest`（全107テスト）がすべてパス（Exit Code 0）。
+
+### 影響範囲
+- 新規作成:
+  - `views/review_view.py`
+  - `tests/test_review_view.py`
+- 更新:
+  - `views/__init__.py`
+  - `AICHANGELOG.md`
+  - `Plan.md`
+
 
