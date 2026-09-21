@@ -146,3 +146,32 @@
   - `for_agent/requirements.md`
   - `Plan.md`
   - `AICHANGELOG.md`
+
+## [2026-09-21] - ループエンジニアリング基盤の配備およびタスク詳細化
+
+### 作業概要
+`old/loop.txt` のループエンジニアリング原則に基づき、開発自律化のための環境基盤を配備。リポジトリルートにプロジェクトルールおよび検証コマンドを定義した `AGENTS.md` を作成。また、`.agents/skills/` 配下に `/plan`, `/loop-step`, `/review` の3つのSkill（コマンド定義）を配備。既存の `Plan.md` を `old/Plan_phase1.md` にバックアップした上で、1タスク＝1実装＋1検証で完結するきめ細かいタスクリストへ再構成。
+
+### Before / After
+- **Before:**
+  - `AGENTS.md` および `.agents/skills/` が存在せず、自律ループ用スラッシュコマンドが未整備。
+  - `Plan.md` のタスク粒度が大きく、1イテレーションでの検証単位が曖昧。
+  - `old/` にフェーズ1時点の計画書バックアップがない状態。
+- **After:**
+  - `AGENTS.md`（Streamlit / pytest / py_compile によるGround Truth検証定義）を新規作成。
+  - `.agents/skills/plan/SKILL.md`（/plan コマンド定義）を作成。
+  - `.agents/skills/loop-step/SKILL.md`（/loop-step コマンド定義）を作成。
+  - `.agents/skills/review/SKILL.md`（/review コマンド定義）を作成。
+  - `old/Plan_phase1.md` に旧計画書を退避・保存。
+  - `Plan.md` を17の具体的ステップにブレイクダウンし、フェーズ2（実装ループ）へ即時移行可能な状態に更新。
+
+### 影響範囲
+- 新規作成:
+  - `AGENTS.md`
+  - `.agents/skills/plan/SKILL.md`
+  - `.agents/skills/loop-step/SKILL.md`
+  - `.agents/skills/review/SKILL.md`
+  - `old/Plan_phase1.md`
+- 更新:
+  - `Plan.md`
+  - `AICHANGELOG.md`
