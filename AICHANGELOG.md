@@ -422,3 +422,49 @@
   - `AICHANGELOG.md`
   - `Plan.md`
 
+---
+
+## 2026-09-21: Phase 2 - タスク10: views/quiz_view.py の実装（モード選択、1問1答、ルビ確認、解説トグル、結果画面）
+
+### 概要
+クイズ画面のメインUIコンポーネントである `views/quiz_view.py` およびパッケージ初期化ファイル `views/__init__.py` を新規実装。要件定義書（`for_agent/requirements.md`）および実装指示書（`for_agent/implementation_guide.md`）に準拠し、4つの状態遷移（モード選択・出題回答中・判定解説・結果サマリー）を持つ堅牢なクイズ学習ステートマシンと、スマートフォンに最適化されたUIを構築した。さらに単体テスト `tests/test_quiz_view.py` を作成し、全92件の pytest テストが正常終了（Exit Code 0）することを確認。
+
+### Before / After
+- **Before:**
+  - `views/` ディレクトリが存在せず、クイズ画面のUIコンポーネントが未実装であった。
+  - セッションステートを用いた画面遷移（モード選択、1問1答、正誤判定、解説表示、結果画面）を処理する機構が存在しなかった。
+- **After:**
+  - `views/__init__.py` を新規作成。
+  - `views/quiz_view.py` を新規実装：
+    - **状態定数**: `QUIZ_STATE_SELECT` ("select"), `QUIZ_STATE_ANSWERING` ("answering"), `QUIZ_STATE_ANSWERED` ("answered"), `QUIZ_STATE_RESULT` ("result")。
+    - **セッション状態管理関数**:
+      - `init_quiz_state()`: クイズ実行に必要なセッション状態キー（`quiz_state`, `quiz_config`, `quiz_questions`, `current_q_index`, `current_selected_option`, `session_results`, `score`）を初期化。
+      - `start_quiz_session()`: サブモード（全カテゴリランダム、カテゴリ指定、苦手復習）に応じて単語を抽出し、シャッフルされた4択問題10問を構築して出題画面へ遷移。
+      - `submit_answer()`: ユーザーの回答判定、DB（`db.record_attempt`）への即時学習履歴記録、スコア加算、結果リストの蓄積。
+      - `next_question()`: 次の問題への遷移、または全問終了時に結果画面（`result`）への遷移。
+      - `reset_to_select()`: クイズ終了時または中断時にモード選択画面へリセット。
+    - **UIレンダリング関数**:
+      - `render_quiz_view(db, user_email, all_words)`: メインエントリーポイント。セッション状態に応じて以下のサブ画面を分岐描画。
+      - `_render_select_screen()`: モード1（心情語→意味）/ モード2（意味→心情語）の選択、サブモード（ランダム/カテゴリ固定/苦手復習）の選択。苦手復習モードは過去に間違えた問題が10問未満の場合に開放条件メッセージを表示し開始ボタンを無効化。
+      - `_render_answering_screen()`: プログレスバー、問題番号表示、問題文カード（`display_question_card`）、ルビ（ふりがな）確認ポップオーバー（`st.popover`）、押しやすい4択ラジオボタン（初期未選択 `index=None`）、回答ボタン（未選択時のバリデーション付き）。
+      - `_render_answered_screen()`: 判定結果バナー（`display_result_banner`）、正解・回答レビュー、意味常時表示（`st.info`）、物語文での場面例＆つまずきポイントのアコーディオン展開（`st.expander`）、次へ進むボタン。
+      - `_render_result_screen()`: 総合スコア、正解数・正解率サマリーカード（`display_stat_card`）、正解数に応じた祝福メッセージ・風船演出（`st.balloons`）、今回解いた10問の正誤詳細アコーディオン一覧、「同じ条件でもう一度解く」ボタン、「モード選択に戻る」ボタン。
+  - `tests/test_quiz_view.py` を新規作成（全13テストケース）：
+    - `init_quiz_state` による初期化の検証。
+    - 各サブモード（ランダム、カテゴリ指定、苦手復習、無効サブモード例外）での `start_quiz_session` 動作検証。
+    - 正解時および不正解時の `submit_answer`（スコア更新、DB記録呼び出し、結果格納、状態遷移）の検証。
+    - `next_question` による問題遷移および最終問からの結果画面遷移の検証。
+    - `reset_to_select` による画面リセットの検証。
+    - 各画面描画関数（`_render_select_screen`, `_render_answering_screen`, `_render_answered_screen`, `_render_result_screen`）の描画正常性検証。
+  - 構文チェック `python -m py_compile` および `pytest`（全92テスト）がすべてパス（Exit Code 0）。
+
+### 影響範囲
+- 新規作成:
+  - `views/__init__.py`
+  - `views/quiz_view.py`
+  - `tests/test_quiz_view.py`
+- 更新:
+  - `AICHANGELOG.md`
+  - `Plan.md`
+
+
