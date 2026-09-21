@@ -208,8 +208,32 @@ def test_render_login_screen_dev(mock_rerun):
         render_login_screen()
 
 
+def test_render_login_screen_prod_configured():
+    """DEV_MODE=False かつ OAuth 設定済みのログイン画面描画の検証"""
+    with patch("app.is_dev_mode", return_value=False), patch(
+        "app.get_google_auth_url", return_value="https://accounts.google.com/oauth_test"
+    ):
+        render_login_screen()
+
+
+def test_render_login_screen_prod_unconfigured():
+    """DEV_MODE=False かつ OAuth 未設定時のログイン画面描画（警告表示）の検証"""
+    with patch("app.is_dev_mode", return_value=False), patch(
+        "app.get_google_auth_url", return_value=None
+    ):
+        render_login_screen()
+
+
+def test_render_login_screen_with_auth_error():
+    """認証エラーが存在する場合のログイン画面描画の検証"""
+    st.session_state.auth_error = "アクセス権限がありません。"
+    with patch("app.is_dev_mode", return_value=True):
+        render_login_screen()
+
+
 def test_render_sidebar(mock_db):
     """サイドバー描画がエラーなく実行されることを検証"""
     st.session_state.current_view = VIEW_QUIZ
     with patch("app.is_dev_mode", return_value=True):
         render_sidebar(mock_db, "test@example.com")
+

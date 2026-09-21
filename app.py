@@ -10,6 +10,14 @@ import os
 from typing import List, Optional
 import streamlit as st
 
+from auth import (
+    authenticate_user,
+    get_allowed_emails,
+    get_google_auth_url,
+    is_dev_mode,
+    logout_user,
+    process_oauth_callback,
+)
 from data_loader import WordItem, load_words
 from db import DatabaseInterface, get_db
 from styles import apply_custom_styles, render_badge
@@ -39,23 +47,6 @@ SAMPLE_DEV_USERS = [
 
 
 # ==============================================================================
-# 環境・設定ヘルパー関数
-# ==============================================================================
-def is_dev_mode() -> bool:
-    """ローカル開発モード（DEV_MODE）が有効かどうかを判定する。"""
-    dev_mode_env = os.getenv("DEV_MODE", "True").strip().lower()
-    return dev_mode_env in ("true", "1", "t", "yes")
-
-
-def get_allowed_emails() -> List[str]:
-    """ホワイトリストに登録された許可メールアドレス一覧を取得する。"""
-    raw_emails = os.getenv("ALLOWED_EMAILS", "")
-    if not raw_emails:
-        return []
-    return [e.strip() for e in raw_emails.split(",") if e.strip()]
-
-
-# ==============================================================================
 # セッション状態管理関数
 # ==============================================================================
 def init_app_session_state() -> None:
@@ -67,8 +58,17 @@ def init_app_session_state() -> None:
     if "user_email" not in st.session_state:
         st.session_state.user_email = DEFAULT_DEV_EMAIL
 
+    if "auth_error" not in st.session_state:
+        st.session_state.auth_error = None
+
     if "current_view" not in st.session_state:
         st.session_state.current_view = VIEW_QUIZ
+
+    # 本番モードかつ未認証の場合、OAuthコールバックの検証を実施
+    if not is_dev_mode() and not st.session_state.is_authenticated:
+        user_info = process_oauth_callback()
+        if user_info and "email" in user_info:
+            authenticate_user(user_info["email"])
 
 
 def switch_view(view_key: str) -> None:
@@ -84,7 +84,7 @@ def switch_view(view_key: str) -> None:
 
 def logout() -> None:
     """ログアウト処理を実行し、セッション状態をリセットする。"""
-    st.session_state.is_authenticated = False
+    logout_user()
     st.session_state.current_view = VIEW_QUIZ
 
 
@@ -96,6 +96,7 @@ def login_as_dev_user(email: str) -> None:
     """
     st.session_state.user_email = email
     st.session_state.is_authenticated = True
+    st.session_state.auth_error = None
 
 
 # ==============================================================================
@@ -105,6 +106,11 @@ def render_login_screen() -> None:
     """未認証時のログイン画面を描画する。"""
     st.title("📖 中学受験 心情語マスター")
     st.write("中学受験国語（物語文）で合否を分ける重要心情語（全272語）の学習アプリです。")
+
+    # 認証エラー（ホワイトリスト外、認可エラー等）が存在する場合は表示
+    auth_error = st.session_state.get("auth_error")
+    if auth_error:
+        st.error(auth_error)
 
     dev_mode = is_dev_mode()
 
@@ -138,14 +144,23 @@ def render_login_screen() -> None:
             st.rerun()
 
     else:
-        # 本番モード (DEV_MODE=False) の場合
-        # Phase 2 タスク15 で Google OAuth 2.0 Web フローが接続される
+        # 本番モード (DEV_MODE=False) の場合: Google OAuth 2.0 Web フロー
         st.warning("🔒 **ログインが必要です**")
         st.write("このアプリケーションは事前登録されたご家族の Google アカウントでのみご利用いただけます。")
 
-        # OAuthログインボタン（タスク15でauth.pyの認証URL発行処理と連携）
-        if st.button("🔑 Google アカウントでログイン", type="primary", use_container_width=True):
-            st.info("※ Google OAuth 認証連携は準備中です。")
+        auth_url = get_google_auth_url()
+        if auth_url:
+            st.link_button(
+                "🔑 Google アカウントでログイン",
+                auth_url,
+                type="primary",
+                use_container_width=True,
+            )
+        else:
+            st.warning(
+                "⚠️ Google OAuth の設定（GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET / REDIRECT_URI）"
+                "が不完全です。.env または環境変数の設定を確認してください。"
+            )
 
 
 # ==============================================================================

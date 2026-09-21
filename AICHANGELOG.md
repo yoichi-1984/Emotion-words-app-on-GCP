@@ -638,3 +638,44 @@
   - `AICHANGELOG.md`
   - `Plan.md`
 
+---
+
+## 2026-09-21: Phase 2 - タスク15: auth.py の実装（Google OAuth 2.0 Webフロー & Gmailホワイトリスト検証）
+
+### 概要
+Google OAuth 2.0 Web フローおよび Gmail アカウントのホワイトリスト認可を行う認証モジュール `auth.py` を新規実装。あわせて `app.py` との統合（認可URL発行、OAuthコールバックの自動検知、セッション状態反映、未登録アカウント拒否画面）を行い、包括的な単体テストスイート `tests/test_auth.py`（全19テスト）を実装した。
+
+### Before / After
+- **Before:**
+  - 認証関連ロジックは `app.py` に簡易な環境変数チェック関数（`is_dev_mode`, `get_allowed_emails`）と開発ユーザーログイン関数が存在するのみで、独立した `auth.py` モジュールは未作成であった。
+  - 本番モード（`DEV_MODE=False`）時の Google OAuth 2.0 認可URL生成、認可コードからのトークン交換、Google ユーザープロファイル（email）取得、ホワイトリスト検証、コールバックパラメータ処理が未実装だった。
+- **After:**
+  - `auth.py` を新規作成:
+    - `is_dev_mode()`: `DEV_MODE` 環境変数の厳密な判定（True/true/1/t/yes）。
+    - `get_allowed_emails()`: `ALLOWED_EMAILS` をパースし小文字正規化リストを取得。
+    - `is_email_allowed(email, allowed_emails)`: 大文字・小文字ブレを吸収したホワイトリスト照合。未設定や空文字は安全側に倒して拒否。
+    - `get_oauth_config()`: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `REDIRECT_URI` の取得とプレースホルダー除外検証。
+    - `get_google_auth_url(state)`: Google OAuth 2.0 認可画面 URL（`openid email profile` スコープ、`prompt=select_account`）の安全な生成。
+    - `exchange_code_for_token(code, config)`: Google Token エンドポイント（`https://oauth2.googleapis.com/token`）への POST によるトークン交換（例外ハンドリング・タイムアウト完備）。
+    - `get_user_info_from_token(access_token)`: Google UserInfo エンドポイントからのメールアドレス・プロファイル取得。
+    - `process_oauth_callback()`: Streamlit の `st.query_params` から認可コードまたはエラーを抽出し、二重実行防止のためクエリパラメータをクリーンアップ。
+    - `authenticate_user(email)`: 取得メールアドレスのホワイトリスト判定および `st.session_state`（`is_authenticated`, `user_email`, `auth_error`）の更新。
+    - `logout_user()`: セッション認証状態およびクエリパラメータの安全な初期化。
+  - `app.py` を更新:
+    - `auth.py` から認証関数をインポートし、`init_app_session_state()` での本番モード時コールバック自動処理を統合。
+    - `render_login_screen()` での認証エラー（アクセス拒否）メッセージ表示および `st.link_button` による Google ログインリンク表示。
+  - `tests/test_auth.py` を新規作成（全19テスト）し、OAuth URL生成、トークン交換、ユーザー情報取得、コールバック、ホワイトリスト照合、ログアウトの網羅的テストを実装。
+  - `tests/test_app.py` に本番モードでのログイン画面描画（OAuth設定あり/なし/エラー表示）のテストを追加。
+  - 全170件の pytest テストおよび全ファイルの py_compile がすべて正常終了（Exit Code 0）。
+
+### 影響範囲
+- 新規作成:
+  - `auth.py`
+  - `tests/test_auth.py`
+- 更新:
+  - `app.py`
+  - `tests/test_app.py`
+  - `Plan.md`
+  - `AICHANGELOG.md`
+
+

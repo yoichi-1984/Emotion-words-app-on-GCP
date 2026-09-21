@@ -26,7 +26,7 @@
 - [x] 12. views/dictionary_view.py の実装（心情語辞典画面・全272語検索・フィルタ・詳細展開）
 - [x] 13. app.py の実装（サイドバー開閉ナビゲーション、セッション状態管理、ローカルモック認証）
 - [x] 14. アプリケーション全体のローカル結合検証（py_compile および pytest）
-- [ ] 15. auth.py の実装（Google OAuth 2.0 Webフロー & Gmailホワイトリスト検証）
+- [x] 15. auth.py の実装（Google OAuth 2.0 Webフロー & Gmailホワイトリスト検証）
 - [ ] 16. db.py への FirestoreDB 実装の追加（Cloud Firestore 連携）
 - [ ] 17. Dockerfile の作成および Cloud Run デプロイ設定の整備
 
