@@ -2,7 +2,7 @@
 
 中学受験 国語 心情語対策アプリケーションのデータベースアクセス層モジュール。
 ユーザー学習履歴モデル (WordStat)、抽象インターフェース (DatabaseInterface)、
-およびローカルJSONモック実装 (LocalJsonDB) を提供する。
+ローカルJSONモック実装 (LocalJsonDB)、および本番用 Cloud Firestore 実装 (FirestoreDB) を提供する。
 """
 
 from abc import ABC, abstractmethod
@@ -274,18 +274,191 @@ class LocalJsonDB(DatabaseInterface):
                 self._write_raw(data)
 
 
+class FirestoreDB(DatabaseInterface):
+    """Google Cloud Firestore を用いた本番用DB実装"""
+
+    def __init__(
+        self,
+        project_id: Optional[str] = None,
+        client: Optional[Any] = None,
+        words_loader: Optional[Callable[[], List[WordItem]]] = None,
+    ) -> None:
+        """FirestoreDB を初期化する。
+
+        Args:
+            project_id: GCP プロジェクトID（未指定時は環境変数 GCP_PROJECT_ID または ADC を参照）
+            client: 外部から注入する firestore.Client（テストモック用）
+            words_loader: 単語マスターデータ取得関数（未指定時は data_loader.load_words）
+        """
+        self.project_id = project_id or os.getenv("GCP_PROJECT_ID")
+        self.words_loader = words_loader or load_words
+        self._client = client
+
+    @property
+    def client(self) -> Any:
+        """Firestore クライアントを遅延初期化して取得する。"""
+        if self._client is None:
+            from google.cloud import firestore
+
+            if self.project_id:
+                self._client = firestore.Client(project=self.project_id)
+            else:
+                self._client = firestore.Client()
+        return self._client
+
+    def get_user_stats(self, email: str) -> Dict[int, WordStat]:
+        """指定ユーザーの全単語統計を取得する。
+        単語マスターに基づき、全272語のデフォルト辞書に Firestore 上のデータをマージして返す。
+        """
+        all_words = self.words_loader()
+        stats_dict: Dict[int, WordStat] = {}
+
+        # 1. 全単語のデフォルト統計を初期化
+        for w in all_words:
+            stats_dict[w.no] = WordStat(
+                word_no=w.no,
+                word=w.word,
+                category=w.category,
+                total_attempts=0,
+                incorrect_count=0,
+                incorrect_rate=0.0,
+                has_ever_failed=False,
+                last_attempt_at=None,
+                last_result=None,
+            )
+
+        # 2. Firestore から users/{email}/stats を取得してマージ
+        stats_ref = self.client.collection("users").document(email).collection("stats")
+        for doc in stats_ref.stream():
+            data = doc.to_dict()
+            if not data:
+                continue
+            try:
+                stat = WordStat.from_dict(data)
+                stats_dict[stat.word_no] = stat
+            except (ValueError, KeyError):
+                continue
+
+        return stats_dict
+
+    def record_attempt(
+        self,
+        email: str,
+        word_no: int,
+        word: str,
+        category: str,
+        is_correct: bool,
+        timestamp: Optional[str] = None,
+    ) -> WordStat:
+        """1問の回答結果を保存・更新し、更新後の WordStat を返す。
+        トランザクションを用いて同時書き込みの整合性を担保する。
+        """
+        from google.cloud import firestore
+
+        record_time = timestamp or get_current_jst_iso()
+        user_ref = self.client.collection("users").document(email)
+        doc_ref = user_ref.collection("stats").document(str(word_no))
+
+        @firestore.transactional
+        def _update_in_transaction(txn) -> WordStat:
+            snapshot = doc_ref.get(transaction=txn)
+            if snapshot.exists:
+                data = snapshot.to_dict() or {}
+                current_stat = WordStat.from_dict(data)
+            else:
+                current_stat = WordStat(
+                    word_no=word_no,
+                    word=word,
+                    category=category,
+                    total_attempts=0,
+                    incorrect_count=0,
+                    incorrect_rate=0.0,
+                    has_ever_failed=False,
+                )
+
+            current_stat.total_attempts += 1
+            if not is_correct:
+                current_stat.incorrect_count += 1
+                current_stat.has_ever_failed = True
+
+            current_stat.incorrect_rate = round(
+                current_stat.incorrect_count / current_stat.total_attempts, 3
+            )
+            current_stat.last_result = "correct" if is_correct else "incorrect"
+            current_stat.last_attempt_at = record_time
+
+            # 単語統計の保存
+            txn.set(doc_ref, current_stat.to_dict())
+            # ユーザードキュメントの最終アクセス更新 (merge)
+            txn.set(
+                user_ref,
+                {
+                    "email": email,
+                    "last_attempt_at": record_time,
+                },
+                merge=True,
+            )
+            return current_stat
+
+        txn = self.client.transaction()
+        return _update_in_transaction(txn)
+
+    def get_failed_words_stats(self, email: str) -> List[WordStat]:
+        """過去に一度でも間違えた（has_ever_failed == True）単語統計のリストを取得する。
+        単語No順でソートして返す。
+        """
+        stats_ref = self.client.collection("users").document(email).collection("stats")
+        query = stats_ref.where("has_ever_failed", "==", True)
+
+        failed_stats: List[WordStat] = []
+        for doc in query.stream():
+            data = doc.to_dict()
+            if not data:
+                continue
+            try:
+                stat = WordStat.from_dict(data)
+                if stat.has_ever_failed:
+                    failed_stats.append(stat)
+            except (ValueError, KeyError):
+                continue
+
+        failed_stats.sort(key=lambda s: s.word_no)
+        return failed_stats
+
+    def reset_user_stats(self, email: str) -> None:
+        """指定ユーザーの統計履歴をリセット（サブコレクション stats のドキュメントを一括削除）する。"""
+        stats_ref = self.client.collection("users").document(email).collection("stats")
+        batch = self.client.batch()
+        count = 0
+
+        for doc in stats_ref.stream():
+            batch.delete(doc.reference)
+            count += 1
+            if count >= 400:
+                batch.commit()
+                batch = self.client.batch()
+                count = 0
+
+        if count > 0:
+            batch.commit()
+
+
 def get_db(
     dev_mode: Optional[bool] = None,
     json_path: Optional[Union[str, Path]] = None,
+    project_id: Optional[str] = None,
+    firestore_client: Optional[Any] = None,
 ) -> DatabaseInterface:
     """環境設定に応じた DatabaseInterface インスタンスを生成・返却するファクトリ関数。
 
     Args:
-        dev_mode: True の場合 LocalJsonDB。None の場合は環境変数 DEV_MODE を参照。
+        dev_mode: True の場合 LocalJsonDB。False の場合 FirestoreDB。None の場合は環境変数 DEV_MODE を参照。
         json_path: LocalJsonDB を利用する場合のカスタムファイルパス。
+        project_id: FirestoreDB を利用する場合の GCP プロジェクトID。
+        firestore_client: FirestoreDB を利用する場合のカスタム/モッククライアント。
 
     Returns:
-        DatabaseInterface: DBアクセスクライアント
+        DatabaseInterface: DBアクセスクライアント (LocalJsonDB または FirestoreDB)
     """
     if dev_mode is None:
         dev_mode_env = os.getenv("DEV_MODE", "True").lower()
@@ -294,7 +467,5 @@ def get_db(
     if dev_mode:
         return LocalJsonDB(filepath=json_path)
 
-    # 本番モード (DEV_MODE=False) の場合:
-    # Phase 2 タスク16で FirestoreDB が追加された際に切り替え可能とする。
-    # 現時点では LocalJsonDB をフォールバック利用。
-    return LocalJsonDB(filepath=json_path)
+    return FirestoreDB(project_id=project_id, client=firestore_client)
+

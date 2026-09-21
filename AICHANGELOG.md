@@ -678,4 +678,34 @@ Google OAuth 2.0 Web フローおよび Gmail アカウントのホワイトリ�
   - `Plan.md`
   - `AICHANGELOG.md`
 
+---
+
+## 2026-09-21: Phase 2 - タスク16: db.py への FirestoreDB 実装の追加（Cloud Firestore 連携）
+
+### 概要
+`for_agent/requirements.md` および `for_agent/implementation_guide.md` の仕様に基づき、本番環境（Google Cloud Run）向けのデータベースアクセス層として `FirestoreDB` を `db.py` に新規実装。トランザクションを用いた安全な同時書き込み、単語別統計サブコレクション（`users/{email}/stats/{word_no}`）の取得・更新・クエリ・一括削除、およびファクトリ関数 `get_db()` による環境変数連動（`DEV_MODE=False` で `FirestoreDB` 返却）を実装した。また、モッククライアントを用いた単体テストスイートを `tests/test_db.py` に追加（全31テスト）し、全177件のテスト正常終了（Exit Code 0）を確認した。
+
+### Before / After
+- **Before:**
+  - `db.py` には `LocalJsonDB` のみが実装されており、`get_db(dev_mode=False)` 呼び出し時もフォールバックとして `LocalJsonDB` が返されていた。
+  - 本番 GCP 環境（Cloud Firestore）と連携する `FirestoreDB` クラスが未実装だった。
+- **After:**
+  - `db.py` に `FirestoreDB(DatabaseInterface)` を実装:
+    - `__init__(project_id, client, words_loader)`: プロジェクトIDおよびテスト用モッククライアントの外部注入に対応。
+    - `client` プロパティ: `google.cloud.firestore.Client` の遅延初期化（ローカルテスト時の安全性を確保）。
+    - `get_user_stats(email)`: 全272語のデフォルト統計辞書を生成し、`users/{email}/stats` サブコレクションのドキュメントをストリーム取得して上書きマージ。
+    - `record_attempt(email, word_no, word, category, is_correct, timestamp)`: `@firestore.transactional` によるトランザクション更新。同時書き込み時の不整合を防ぎつつ、`total_attempts`, `incorrect_count`, `incorrect_rate`, `has_ever_failed`, `last_result`, `last_attempt_at` を算出・更新し、ユーザードキュメント（`users/{email}`）のアクセス日時も `merge=True` で更新。
+    - `get_failed_words_stats(email)`: `stats` サブコレクションから `has_ever_failed == True` をクエリし、単語No順（昇順）でソートして返却。
+    - `reset_user_stats(email)`: バッチコミット（上限分割）を用いた `stats` サブコレクションの一括削除。
+    - `get_db(dev_mode, json_path, project_id, firestore_client)`: `dev_mode=False`（または `DEV_MODE=False`）時に `FirestoreDB` を返却するよう更新。
+  - `tests/test_db.py` に `TestFirestoreDB` クラスおよび `TestGetDBFactory` のテストケースを追加（計7件追加、`tests/test_db.py` 全31テスト）。
+  - プロジェクト全テスト（177テスト）がすべてパス（Exit Code 0）。
+
+### 影響範囲
+- 更新:
+  - `db.py`
+  - `tests/test_db.py`
+  - `Plan.md`
+  - `AICHANGELOG.md`
+
 

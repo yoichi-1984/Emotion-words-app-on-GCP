@@ -9,11 +9,13 @@ from datetime import datetime
 import json
 import os
 from pathlib import Path
+from unittest.mock import MagicMock
 import pytest
 
 from data_loader import WordItem, load_words
 from db import (
     DatabaseInterface,
+    FirestoreDB,
     LocalJsonDB,
     WordStat,
     get_current_jst_iso,
@@ -470,16 +472,235 @@ class TestGetDBFactory:
         assert isinstance(db, LocalJsonDB)
         assert db.filepath == temp_db_path
 
+    def test_get_db_dev_mode_false(self):
+        """dev_mode=False で FirestoreDB のインスタンスが返されること"""
+        mock_client = MagicMock()
+        db = get_db(dev_mode=False, project_id="test-project", firestore_client=mock_client)
+        assert isinstance(db, DatabaseInterface)
+        assert isinstance(db, FirestoreDB)
+        assert db.project_id == "test-project"
+        assert db.client is mock_client
+
     def test_get_db_with_env_var(self, monkeypatch, temp_db_path):
         """環境変数 DEV_MODE に応じてインスタンスが生成されること"""
         monkeypatch.setenv("DEV_MODE", "True")
         db = get_db(dev_mode=None, json_path=temp_db_path)
         assert isinstance(db, LocalJsonDB)
 
-        # DEV_MODE=False (現フェーズでは LocalJsonDB フォールバック)
+        # DEV_MODE=False では FirestoreDB が返される
         monkeypatch.setenv("DEV_MODE", "False")
-        db_prod = get_db(dev_mode=None, json_path=temp_db_path)
+        mock_client = MagicMock()
+        db_prod = get_db(dev_mode=None, firestore_client=mock_client)
         assert isinstance(db_prod, DatabaseInterface)
+        assert isinstance(db_prod, FirestoreDB)
+
+
+class TestFirestoreDB:
+    """FirestoreDB の読み書き・クエリ・トランザクション等の動作検証"""
+
+    @pytest.fixture
+    def mock_firestore_setup(self):
+        """Firestore クライアントと各コレクション/ドキュメントのモック階層を構築するフィクスチャ"""
+        mock_client = MagicMock()
+        mock_txn = MagicMock()
+        mock_client.transaction.return_value = mock_txn
+
+        users_col = MagicMock()
+        user_doc = MagicMock()
+        stats_col = MagicMock()
+        stat_doc = MagicMock()
+
+        mock_client.collection.return_value = users_col
+        users_col.document.return_value = user_doc
+        user_doc.collection.return_value = stats_col
+        stats_col.document.return_value = stat_doc
+
+        return {
+            "client": mock_client,
+            "txn": mock_txn,
+            "users_col": users_col,
+            "user_doc": user_doc,
+            "stats_col": stats_col,
+            "stat_doc": stat_doc,
+        }
+
+    def test_firestore_db_init(self, mock_firestore_setup):
+        """FirestoreDB の初期化とプロパティの動作検証"""
+        client = mock_firestore_setup["client"]
+        db = FirestoreDB(project_id="my-custom-project", client=client)
+        assert db.project_id == "my-custom-project"
+        assert db.client is client
+
+    def test_firestore_db_get_user_stats_all_words(self, mock_firestore_setup, all_words):
+        """FirestoreDB.get_user_stats で全単語が返され、Firestore の履歴が正しくマージされること"""
+        setup = mock_firestore_setup
+        db = FirestoreDB(client=setup["client"])
+
+        doc_data = {
+            "word_no": 1,
+            "word": "気後れ",
+            "category": "不安・恐れ",
+            "total_attempts": 2,
+            "incorrect_count": 1,
+            "incorrect_rate": 0.5,
+            "has_ever_failed": True,
+            "last_attempt_at": "2026-09-21T10:00:00+09:00",
+            "last_result": "incorrect",
+        }
+        mock_doc = MagicMock()
+        mock_doc.to_dict.return_value = doc_data
+        setup["stats_col"].stream.return_value = [mock_doc]
+
+        stats = db.get_user_stats("learner@example.com")
+        assert len(stats) == len(all_words)
+        assert len(stats) == 272
+
+        # マージされた単語の検証
+        w1_stat = stats[1]
+        assert w1_stat.total_attempts == 2
+        assert w1_stat.incorrect_count == 1
+        assert w1_stat.incorrect_rate == 0.5
+        assert w1_stat.has_ever_failed is True
+        assert w1_stat.last_result == "incorrect"
+
+        # 未解答の単語はデフォルト値
+        w2_stat = stats[2]
+        assert w2_stat.total_attempts == 0
+        assert w2_stat.has_ever_failed is False
+
+    def test_firestore_db_record_attempt_first_incorrect(self, mock_firestore_setup, sample_word):
+        """初回不正解時の記録がトランザクション経由で適切に保存されること"""
+        setup = mock_firestore_setup
+        db = FirestoreDB(client=setup["client"])
+
+        # ドキュメントが未作成（snapshot.exists == False）
+        mock_snapshot = MagicMock()
+        mock_snapshot.exists = False
+        setup["stat_doc"].get.return_value = mock_snapshot
+
+        email = "student@example.com"
+        stat = db.record_attempt(
+            email=email,
+            word_no=sample_word.no,
+            word=sample_word.word,
+            category=sample_word.category,
+            is_correct=False,
+            timestamp="2026-09-21T11:00:00+09:00",
+        )
+
+        assert stat.word_no == sample_word.no
+        assert stat.total_attempts == 1
+        assert stat.incorrect_count == 1
+        assert stat.incorrect_rate == 1.0
+        assert stat.has_ever_failed is True
+        assert stat.last_result == "incorrect"
+        assert stat.last_attempt_at == "2026-09-21T11:00:00+09:00"
+
+        # トランザクションによる保存呼び出しの検証
+        setup["txn"].set.assert_any_call(setup["stat_doc"], stat.to_dict())
+        setup["txn"].set.assert_any_call(
+            setup["user_doc"],
+            {"email": email, "last_attempt_at": "2026-09-21T11:00:00+09:00"},
+            merge=True,
+        )
+
+    def test_firestore_db_record_attempt_cumulative(self, mock_firestore_setup, sample_word):
+        """複数回回答時の累積統計と不正解率計算（四捨五入）の検証"""
+        setup = mock_firestore_setup
+        db = FirestoreDB(client=setup["client"])
+
+        # 既存ドキュメントが存在する場合
+        existing_data = {
+            "word_no": sample_word.no,
+            "word": sample_word.word,
+            "category": sample_word.category,
+            "total_attempts": 2,
+            "incorrect_count": 1,
+            "incorrect_rate": 0.5,
+            "has_ever_failed": True,
+            "last_attempt_at": "2026-09-21T09:00:00+09:00",
+            "last_result": "incorrect",
+        }
+        mock_snapshot = MagicMock()
+        mock_snapshot.exists = True
+        mock_snapshot.to_dict.return_value = existing_data
+        setup["stat_doc"].get.return_value = mock_snapshot
+
+        # 3回目: 正解 (1/3 = 0.333)
+        stat = db.record_attempt(
+            email="student@example.com",
+            word_no=sample_word.no,
+            word=sample_word.word,
+            category=sample_word.category,
+            is_correct=True,
+            timestamp="2026-09-21T12:00:00+09:00",
+        )
+
+        assert stat.total_attempts == 3
+        assert stat.incorrect_count == 1
+        assert stat.incorrect_rate == 0.333
+        assert stat.has_ever_failed is True
+        assert stat.last_result == "correct"
+        assert stat.last_attempt_at == "2026-09-21T12:00:00+09:00"
+
+    def test_firestore_db_get_failed_words_stats(self, mock_firestore_setup):
+        """間違えた単語のフィルタリングと単語No昇順ソートの検証"""
+        setup = mock_firestore_setup
+        db = FirestoreDB(client=setup["client"])
+
+        doc_10 = MagicMock()
+        doc_10.to_dict.return_value = {
+            "word_no": 10,
+            "word": "word10",
+            "category": "cat",
+            "total_attempts": 2,
+            "incorrect_count": 1,
+            "incorrect_rate": 0.5,
+            "has_ever_failed": True,
+        }
+        doc_2 = MagicMock()
+        doc_2.to_dict.return_value = {
+            "word_no": 2,
+            "word": "word2",
+            "category": "cat",
+            "total_attempts": 1,
+            "incorrect_count": 1,
+            "incorrect_rate": 1.0,
+            "has_ever_failed": True,
+        }
+
+        mock_query = MagicMock()
+        mock_query.stream.return_value = [doc_10, doc_2]
+        setup["stats_col"].where.return_value = mock_query
+
+        failed_stats = db.get_failed_words_stats("user@example.com")
+        setup["stats_col"].where.assert_called_once_with("has_ever_failed", "==", True)
+
+        assert len(failed_stats) == 2
+        # 単語No順 (2, 10) にソートされていること
+        assert failed_stats[0].word_no == 2
+        assert failed_stats[1].word_no == 10
+
+    def test_firestore_db_reset_user_stats(self, mock_firestore_setup):
+        """FirestoreDB.reset_user_stats でバッチ削除が正しく実行されること"""
+        setup = mock_firestore_setup
+        db = FirestoreDB(client=setup["client"])
+
+        mock_batch = MagicMock()
+        setup["client"].batch.return_value = mock_batch
+
+        doc1 = MagicMock()
+        doc1.reference = "ref_1"
+        doc2 = MagicMock()
+        doc2.reference = "ref_2"
+        setup["stats_col"].stream.return_value = [doc1, doc2]
+
+        db.reset_user_stats("user@example.com")
+
+        mock_batch.delete.assert_any_call("ref_1")
+        mock_batch.delete.assert_any_call("ref_2")
+        mock_batch.commit.assert_called_once()
+
 
 
 class TestConcurrencySafety:
