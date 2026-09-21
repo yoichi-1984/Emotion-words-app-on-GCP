@@ -240,4 +240,36 @@
   - `Plan.md`
   - `AICHANGELOG.md`
 
+## [2026-09-21] - tests/test_data_loader.py の作成と pytest による単語データ整合性検証
+
+### 作業概要
+`data_loader.py` の単体テストおよび `all_words.csv`（全272語）のデータ整合性を自動検証する `tests/test_data_loader.py` を作成し、pytest を用いて15項目の全テストをパス（Exit Code 0）することを確認。
+
+### Before / After
+- **Before:**
+  - `tests/` ディレクトリが存在せず、単語データや `data_loader.py` の動作検証が手動実行のみであった。
+- **After:**
+  - `tests/` パッケージおよび `tests/test_data_loader.py` を作成。
+  - 以下の検証項目を網羅した15件のテストケースを実装：
+    1. CSVデフォルトパスの実在確認
+    2. 全272語の過不足ない読み込み確認
+    3. No 1〜272の連番・重複なし確認
+    4. 必須項目（カテゴリ、語、読み、難易度、意味、文脈例、つまずきポイント）の非空・完全性検証
+    5. 全8カテゴリの存在および各カテゴリ34語の均等配分検証
+    6. 難易度（並・中・高）の完全網羅検証
+    7. カテゴリ別フィルタ・難易度別フィルタの正常動作
+    8. 語名・読み仮名・意味キーワードによる部分一致検索の動作
+    9. 存在しないファイルパス時の FileNotFoundError 送出検証
+    10. 必須列不足CSV時の ValueError 送出検証
+  - `pytest -v tests/test_data_loader.py` を実行し、全15件が正常終了（Exit Code 0）。
+
+### 影響範囲
+- 新規作成:
+  - `tests/__init__.py`
+  - `tests/test_data_loader.py`
+- 更新:
+  - `Plan.md`
+  - `AICHANGELOG.md`
+
+
 
