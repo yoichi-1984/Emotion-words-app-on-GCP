@@ -93,19 +93,34 @@ $gcloudExe = $gcloudCmd.Source
 
 # 3. デプロイ実行コマンドの構築
 # Cloud Run 本番環境では DEV_MODE=False で起動
-$envList = @(
-    "DEV_MODE=False",
-    "GCP_PROJECT_ID=$ProjectId",
-    "GOOGLE_CLIENT_ID=$clientId",
-    "GOOGLE_CLIENT_SECRET=$clientSecret",
-    "ALLOWED_EMAILS=$allowedEmails",
-    "REDIRECT_URI=$redirectUri"
+# カンマを含む ALLOWED_EMAILS 等を安全に受け渡すため、一時 YAML ファイルを生成して --env-vars-file を利用
+$localDataDir = Join-Path $PSScriptRoot "local_data"
+if (-not (Test-Path $localDataDir)) {
+    New-Item -ItemType Directory -Path $localDataDir -Force | Out-Null
+}
+$tmpEnvFile = Join-Path $localDataDir "cloudrun_env.yaml"
+$yamlLines = @(
+    'DEV_MODE: "False"',
+    "GCP_PROJECT_ID: `"$ProjectId`"",
+    "GOOGLE_CLIENT_ID: `"$clientId`"",
+    "GOOGLE_CLIENT_SECRET: `"$clientSecret`"",
+    "ALLOWED_EMAILS: `"$allowedEmails`"",
+    "REDIRECT_URI: `"$redirectUri`""
 )
-$envString = $envList -join ","
+$yamlContent = $yamlLines -join "`n"
+[System.IO.File]::WriteAllText($tmpEnvFile, $yamlContent, [System.Text.Encoding]::UTF8)
+
+$imageTag = "gcr.io/$ProjectId/$ServiceName:latest"
+
+$buildArgs = @(
+    "builds", "submit",
+    "--tag", $imageTag,
+    "--project", $ProjectId
+)
 
 $deployArgs = @(
     "run", "deploy", $ServiceName,
-    "--source", ".",
+    "--image", $imageTag,
     "--project", $ProjectId,
     "--region", $Region,
     "--platform", "managed",
@@ -114,11 +129,12 @@ $deployArgs = @(
     "--max-instances", "2",
     "--memory", "512Mi",
     "--cpu", "1",
-    "--set-env-vars", $envString
+    "--env-vars-file", $tmpEnvFile
 )
 
-Write-Host "[STEP 1] Cloud Run デプロイコマンドの準備完了" -ForegroundColor Cyan
-Write-Host "実行コマンド: gcloud $($deployArgs -join ' ')" -ForegroundColor DarkGray
+Write-Host "[STEP 1] Cloud Run デプロイ準備完了" -ForegroundColor Cyan
+Write-Host "イメージタグ: $imageTag" -ForegroundColor DarkGray
+Write-Host "環境変数ファイル: $tmpEnvFile" -ForegroundColor DarkGray
 Write-Host ""
 
 if ($DryRun) {
@@ -126,8 +142,17 @@ if ($DryRun) {
     exit 0
 }
 
-# 4. デプロイの実行
-Write-Host "[STEP 2] Cloud Run へデプロイ中（ソースビルド & コンテナ配備）..." -ForegroundColor Green
+# 4. コンテナビルド & デプロイの実行
+Write-Host "[STEP 2] Cloud Build によるコンテナビルド中 ($imageTag)..." -ForegroundColor Green
+& $gcloudExe @buildArgs
+
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "[ERROR] Cloud Build によるイメージビルドに失敗しました (Exit Code: $LASTEXITCODE)。" -ForegroundColor Red
+    exit $LASTEXITCODE
+}
+
+Write-Host ""
+Write-Host "[STEP 3] Cloud Run へコンテナ配備中..." -ForegroundColor Green
 & $gcloudExe @deployArgs
 
 if ($LASTEXITCODE -ne 0) {

@@ -52,9 +52,25 @@ if [ -z "$CLIENT_ID" ] || [ -z "$CLIENT_SECRET" ] || [ -z "$ALLOWED_EMAILS" ]; t
     exit 1
 fi
 
-echo "[STEP 1] Cloud Run へソースデプロイ中..."
+IMAGE_TAG="gcr.io/$PROJECT_ID/$SERVICE_NAME:latest"
+TMP_ENV_FILE="local_data/cloudrun_env.yaml"
+mkdir -p local_data
+cat <<EOF > "$TMP_ENV_FILE"
+DEV_MODE: "False"
+GCP_PROJECT_ID: "$PROJECT_ID"
+GOOGLE_CLIENT_ID: "$CLIENT_ID"
+GOOGLE_CLIENT_SECRET: "$CLIENT_SECRET"
+ALLOWED_EMAILS: "$ALLOWED_EMAILS"
+REDIRECT_URI: "$REDIRECT_URI"
+EOF
+
+echo "[STEP 1] Cloud Build によるイメージビルド中 ($IMAGE_TAG)..."
+gcloud builds submit --tag "$IMAGE_TAG" --project "$PROJECT_ID"
+
+echo ""
+echo "[STEP 2] Cloud Run へコンテナ配備中..."
 gcloud run deploy "$SERVICE_NAME" \
-    --source . \
+    --image "$IMAGE_TAG" \
     --project "$PROJECT_ID" \
     --region "$REGION" \
     --platform managed \
@@ -63,7 +79,8 @@ gcloud run deploy "$SERVICE_NAME" \
     --max-instances 2 \
     --memory 512Mi \
     --cpu 1 \
-    --set-env-vars "DEV_MODE=False,GCP_PROJECT_ID=$PROJECT_ID,GOOGLE_CLIENT_ID=$CLIENT_ID,GOOGLE_CLIENT_SECRET=$CLIENT_SECRET,ALLOWED_EMAILS=$ALLOWED_EMAILS,REDIRECT_URI=$REDIRECT_URI"
+    --env-vars-file "$TMP_ENV_FILE"
+
 
 SERVICE_URL=$(gcloud run services describe "$SERVICE_NAME" --project "$PROJECT_ID" --region "$REGION" --format "value(status.url)")
 
