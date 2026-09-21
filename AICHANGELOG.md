@@ -216,3 +216,28 @@
   - `Plan.md`
   - `AICHANGELOG.md`
 
+## [2026-09-21] - data_loader.py の実装（WordItem 定義、all_words.csv 読み込み、キャッシュ関数）
+
+### 作業概要
+心情語データモデル `WordItem` の定義、全272語の単語マスターデータ (`all_words.csv`) の読み込み・検証、Streamlit の高速キャッシュ関数 (`@st.cache_data`)、およびカテゴリ別フィルタ・難易度別フィルタ・全文検索を行うユーティリティ関数を備えた `data_loader.py` を新規作成。
+
+### Before / After
+- **Before:**
+  - 単語データをPythonコードから安全・構造的に読み込むためのモジュールが存在しなかった。
+- **After:**
+  - `data_loader.py` を作成。
+  - `WordItem`（frozen dataclass）を定義し、型安全なデータ構造を提供。
+  - `find_default_csv_path()` により実行ディレクトリに依存せず柔軟に `all_words.csv` を探索。
+  - `parse_csv_to_words()` により `utf-8-sig` でCSVを安全にパースし、NaNの除去・型変換を実施。
+  - `@st.cache_data` を付与した `load_words()` により、Streamlit アプリ実行時の高速キャッシュを実現。
+  - `get_categories()`, `filter_by_category()`, `filter_by_difficulty()`, `search_words()` などの便利関数を提供。
+  - `python -m py_compile data_loader.py` による構文検証、および全272語・8カテゴリ正常読み込みのアサーション検証に合格（Exit Code 0）。
+
+### 影響範囲
+- 新規作成:
+  - `data_loader.py`
+- 更新:
+  - `Plan.md`
+  - `AICHANGELOG.md`
+
+
