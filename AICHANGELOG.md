@@ -329,3 +329,30 @@
   - `Plan.md`
   - `AICHANGELOG.md`
 
+## [2026-09-21] - db.py の実装（DatabaseInterface、WordStat 定義、LocalJsonDB モック実装）
+
+### 作業概要
+`for_agent/implementation_guide.md` および `for_agent/requirements.md` の仕様に基づき、データベースアクセス抽象化層 `db.py` を新規実装。学習履歴モデル `WordStat`、抽象インターフェース `DatabaseInterface`、およびローカル環境での完全動作を保証する `LocalJsonDB` モック実装を作成。また、ファクトリ関数 `get_db()` を提供し、`quiz_logic.py` とのモデル統一を行った。
+
+### Before / After
+- **Before:**
+  - データベースアクセス層が存在せず、学習履歴（出題回数・不正解回数・正解率・直近結果等）の永続化インターフェースが未定義。
+  - `WordStat` モデルが `quiz_logic.py` 内に暫定的に定義されており、DB層とのモデル共有がなされていなかった。
+- **After:**
+  - `db.py` を新規実装：
+    - `WordStat`: 単語別学習履歴モデル（`to_dict()`, `from_dict()` 完備）。
+    - `DatabaseInterface`: 抽象基底クラス（`get_user_stats`, `record_attempt`, `get_failed_words_stats`, `reset_user_stats`）。
+    - `LocalJsonDB`: `local_data/mock_user_stats.json` にUTF-8・インデント付きで安全に保存するモックDB。スレッドセーフ（`threading.Lock`）かつ自動ディレクトリ生成対応。全272語の未出題単語もデフォルト値で補完して返却。
+    - `get_db()`: 環境変数 `DEV_MODE` に応じて適切な DB インスタンスを返すファクトリ関数。
+  - `quiz_logic.py` 内の重複定義を解消し、`db.py` の `WordStat`, `JST`, `get_current_jst_iso` をインポート・再エクスポートする構造に統一。
+  - `python -m py_compile db.py quiz_logic.py` および `pytest`（全40テスト）がすべて正常終了（Exit Code 0）。
+
+### 影響範囲
+- 新規作成:
+  - `db.py`
+- 更新:
+  - `quiz_logic.py`
+  - `AICHANGELOG.md`
+  - `Plan.md`
+
+

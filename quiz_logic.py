@@ -9,41 +9,7 @@ import random
 from typing import Any, Dict, List, Optional, Tuple
 
 from data_loader import WordItem
-
-
-# 日本標準時 (JST: UTC+9)
-JST = timezone(timedelta(hours=9))
-
-
-@dataclass
-class WordStat:
-    """ユーザーの単語別学習履歴モデル
-
-    Attributes:
-        word_no: 単語No (1 〜 272)
-        word: 心情語
-        category: カテゴリ名
-        total_attempts: 総出題回数
-        incorrect_count: 不正解回数
-        incorrect_rate: 不正解率 (incorrect_count / total_attempts, 小数点第3位まで四捨五入)
-        has_ever_failed: 過去に1度でも間違えたか（一度Trueになると永続化）
-        last_attempt_at: 最終回答日時 (JST ISO 8601文字列)
-        last_result: 最終回答結果 ("correct" | "incorrect")
-    """
-
-    word_no: int
-    word: str
-    category: str
-    total_attempts: int = 0
-    incorrect_count: int = 0
-    incorrect_rate: float = 0.0
-    has_ever_failed: bool = False
-    last_attempt_at: Optional[str] = None
-    last_result: Optional[str] = None
-
-    def to_dict(self) -> Dict[str, Any]:
-        """辞書形式に変換する。"""
-        return asdict(self)
+from db import JST, WordStat, get_current_jst_iso
 
 
 @dataclass
@@ -85,15 +51,6 @@ class QuizQuestion:
             "tips": self.target_word.tips,
             "difficulty": self.target_word.difficulty,
         }
-
-
-def get_current_jst_iso() -> str:
-    """現在の日時を JST (UTC+9) の ISO 8601 形式文字列で取得する。
-
-    Returns:
-        str: 例 "2026-09-21T12:00:00+09:00"
-    """
-    return datetime.now(JST).isoformat()
 
 
 def select_quiz_words(pool: List[WordItem], count: int = 10) -> List[WordItem]:
